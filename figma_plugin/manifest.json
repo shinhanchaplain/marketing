@@ -1,0 +1,10 @@
+{
+  "name": "마케팅 자동화 툴 (10섹션 피그마 빌더)",
+  "id": "antigravity-marketing-builder",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": [
+    "figma"
+  ]
+}

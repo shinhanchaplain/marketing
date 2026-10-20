@@ -42,26 +42,38 @@ html_content = f"""<!DOCTYPE html>
 </head>
 <body class="bg-slate-100 text-slate-900 min-h-screen">
 
-  <!-- 상단 네비게이션 헤더 -->
+  <!-- 상단 네비게이션 헤더 (입력 페이지 / 결과 페이지 명확히 분리) -->
   <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-50 shadow-md">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
       <div class="flex items-center gap-3">
-        <span class="px-2.5 py-1 rounded-lg bg-emerald-500 text-slate-950 font-black text-xs">WEB STUDIO v2.0</span>
+        <span class="px-2.5 py-1 rounded-lg bg-emerald-500 text-slate-950 font-black text-xs">WEB STUDIO v2.5</span>
         <div>
-          <h1 class="text-base sm:text-lg font-extrabold tracking-tight">⚡ AI 마케팅 & 상세페이지 자동화 웹 스튜디오</h1>
-          <p class="text-xs text-slate-400">GitHub 4대 오픈소스 아키텍처 + 하얀돌랩 8대 체크리스트 + 표시광고법 진실성 엔진</p>
+          <h1 class="text-base sm:text-lg font-extrabold tracking-tight">⚡ AI 마케팅 상세페이지 & 랜딩페이지 스튜디오</h1>
+          <p class="text-xs text-slate-400">입력 화면과 결과 확인 화면이 깔끔하게 분리된 워크스페이스</p>
         </div>
       </div>
-      <div class="flex items-center gap-2 text-xs">
-        <span class="px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-emerald-400 font-semibold">최종 승인권자: 김진호 박사</span>
+      <div class="flex items-center gap-2">
+        <button id="tab_btn_input" onclick="switchPage('input')" class="px-4 py-2 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs transition shadow">
+          1️⃣ 📝 상품 정보 입력 페이지
+        </button>
+        <button id="tab_btn_result" onclick="switchPage('result')" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 font-bold text-xs transition border border-slate-700">
+          2️⃣ 🎨 생성 결과 확인 & 다운로드
+        </button>
       </div>
     </div>
   </header>
 
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+  <main class="max-w-5xl mx-auto px-4 sm:px-6 py-8">
 
-    <!-- 좌측 컨트롤 패널 (입력 샘플, 조건부 제어, STOP 검증, 승인 대기함) -->
-    <section class="lg:col-span-5 space-y-5">
+    <!-- ==================== [페이지 1] 상품 정보 입력 전용 화면 ==================== -->
+    <section id="page_input" class="space-y-6">
+      <div class="bg-emerald-900 text-white rounded-2xl p-5 shadow-md flex items-center justify-between">
+        <div>
+          <span class="px-2.5 py-0.5 rounded-full bg-emerald-400 text-slate-950 font-black text-xs">PAGE 1 · INPUT WIZARD</span>
+          <h2 class="text-lg sm:text-xl font-black mt-1">📝 어떤 상품의 상세페이지·랜딩페이지를 만드시나요?</h2>
+          <p class="text-xs text-emerald-100 mt-0.5">아래 필수 항목만 순서대로 확인/입력한 뒤 맨 아래 [생성하고 결과 보러가기] 버튼을 누르세요.</p>
+        </div>
+      </div>
 
       <!-- [Step 0] 02_입력_샘플.md 원클릭 로더 -->
       <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
@@ -163,38 +175,51 @@ html_content = f"""<!DOCTYPE html>
       </div>
 
       <!-- [Step 4] 04_규칙과_예외.md 실시간 멈춤 조건(STOP-01 ~ 04) 검증기 -->
-      <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-2">
-        <h2 class="text-sm font-black text-slate-800">🛡️ [Step 4] 04_규칙과_예외 멈춤 조건(Stop Rules) 실시간 검증</h2>
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-3">
+        <h2 class="text-sm font-black text-slate-800">🛡️ [Step 4] 필수 입력값 및 안전 규칙(STOP-01~04) 실시간 검증</h2>
         <div id="stop_status_box" class="text-xs space-y-1.5"></div>
+        <button id="btn_go_result" onclick="switchPage('result')" class="w-full py-4 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm sm:text-base shadow-lg transition cursor-pointer">
+          🚀 입력 완료! 상세페이지 생성하고 [결과 확인 페이지]로 이동 ➔
+        </button>
+      </div>
+
+    </section>
+
+    <!-- ==================== [페이지 2] 생성 결과 확인 & 다운로드 전용 화면 ==================== -->
+    <section id="page_result" class="space-y-6" style="display:none;">
+
+      <div class="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+        <div>
+          <span class="px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-black text-xs">PAGE 2 · RESULT & EXPORT</span>
+          <h2 class="text-lg font-black text-slate-900 mt-1">🎨 생성된 상세페이지 & 랜딩페이지 결과 확인</h2>
+        </div>
+        <button onclick="switchPage('input')" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs border border-slate-300 transition">
+          ⬅️ 입력 내용 수정하러 가기
+        </button>
       </div>
 
       <!-- [Step 5] 06_금지와_승인.md 보류/승인 대기함 & 원클릭 내보내기 -->
       <div class="bg-slate-900 text-white rounded-2xl p-5 shadow-lg space-y-3">
         <div class="flex items-center justify-between">
-          <h2 class="text-sm font-black text-emerald-400">👑 [Step 5] 보류/승인 대기함 (최종 승인: 김진호 박사)</h2>
+          <h2 class="text-sm font-black text-emerald-400">👑 [최종 검수 및 다운로드] 보류/승인 대기함 (최종 승인: 김진호 박사)</h2>
           <span id="approval_badge" class="px-2 py-0.5 rounded text-[11px] font-black bg-emerald-500 text-slate-950">PASS 승인됨</span>
         </div>
         <p class="text-xs text-slate-300">06_금지와_승인.md 원칙에 따라 아래 4대 검수 항목이 모두 체크되어야 외부 배포용 파일 다운로드가 활성화됩니다.</p>
-        <div class="space-y-1.5 text-xs text-slate-200">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-200">
           <label class="flex items-center gap-2 cursor-pointer"><input id="ap_1" type="checkbox" checked onchange="updateStudio()" /> 1. 전자책 및 종이책 구매 링크 정상 연결 확인</label>
           <label class="flex items-center gap-2 cursor-pointer"><input id="ap_2" type="checkbox" checked onchange="updateStudio()" /> 2. 거짓 구매 후기 미포함 (표시광고법 준수) 확인</label>
           <label class="flex items-center gap-2 cursor-pointer"><input id="ap_3" type="checkbox" checked onchange="updateStudio()" /> 3. 비교표 및 무료 사은품 혜택 사실 여부 확인</label>
           <label class="flex items-center gap-2 cursor-pointer"><input id="ap_4" type="checkbox" checked onchange="updateStudio()" /> 4. 제목 2줄 균형 및 16:9 이미지 좌우 여백 확인</label>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
-          <button id="btn_dl_html" onclick="downloadStandaloneHTML()" class="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition shadow-md">
-            🌐 배포용 단일 HTML 다운로드
+          <button id="btn_dl_html" onclick="downloadStandaloneHTML()" class="w-full py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm transition shadow-md">
+            🌐 배포용 단일 HTML 웹페이지 다운로드
           </button>
-          <button id="btn_print_pdf" onclick="window.print()" class="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-600 font-bold text-xs transition">
+          <button id="btn_print_pdf" onclick="window.print()" class="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-600 font-bold text-xs sm:text-sm transition">
             🖨️ 고화질 PDF / 인쇄 저장
           </button>
         </div>
       </div>
-
-    </section>
-
-    <!-- 우측 실시간 프리뷰 & 하얀돌랩 8대 체크리스트 채점 리포트 -->
-    <section class="lg:col-span-7 space-y-5">
 
       <!-- 하얀돌랩 8대 체크리스트 100점 진단 바 -->
       <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-4">
@@ -219,6 +244,26 @@ html_content = f"""<!DOCTYPE html>
   </main>
 
   <script>
+    function switchPage(pageName) {{
+      const pInput = document.getElementById('page_input');
+      const pResult = document.getElementById('page_result');
+      const bInput = document.getElementById('tab_btn_input');
+      const bResult = document.getElementById('tab_btn_result');
+      updateStudio();
+      if (pageName === 'result') {{
+        pInput.style.display = 'none';
+        pResult.style.display = 'block';
+        bResult.className = "px-4 py-2 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs transition shadow";
+        bInput.className = "px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 font-bold text-xs transition border border-slate-700";
+        window.scrollTo({{ top: 0, behavior: 'smooth' }});
+      }} else {{
+        pInput.style.display = 'block';
+        pResult.style.display = 'none';
+        bInput.className = "px-4 py-2 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs transition shadow";
+        bResult.className = "px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 font-bold text-xs transition border border-slate-700";
+        window.scrollTo({{ top: 0, behavior: 'smooth' }});
+      }}
+    }}
     const COVER_B64 = "{cover_b64}";
     const PAIN_B64 = "{pain_b64}";
     const SOL_B64 = "{sol_b64}";

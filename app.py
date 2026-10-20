@@ -105,10 +105,15 @@ with st.expander("🛠️ [1단계] 분석 모드 선택 및 인터넷 링크 / 
                 height=85
             )
             target_audience = st.text_area(
-                "타깃 고객",
+                "타깃 고객 및 핵심 소개 문구",
                 value="자신의 전문 영역에서 어려움을 이겨낸 경험을 책으로 펴내어 퍼스널 브랜딩을 완성하고, 부크크 0원 출판 및 네이버 공식 작가 인물등록까지 달성하고 싶은 직장인·전문가·1인 기업가",
                 height=70
             )
+            with st.expander("✨ 메인 헤드라인 / 고통(Problem) / 해결책(Solution) 카피 직접 커스텀 (선택)", expanded=False):
+                custom_h1 = st.text_input("히어로 상단 1줄 헤드라인", value="이력서 100장보다 강력한 내 이름의 책 한 권,")
+                custom_h2 = st.text_input("히어로 상단 2줄 강조 헤드라인", value=f"『{prod_title.split('(')[0].strip() or '내 책'}』로 완벽하게 증명하세요.")
+                custom_pain = st.text_input("고객 고통 상황(Problem) 헤드라인", value='"내세울 스펙도 없고 글솜씨도 없는데, 내가 과연 책을 쓸 수 있을까?"')
+                custom_sol = st.text_input("핵심 해결책(Solution) 헤드라인", value="뼈대만 던져주면 AI가 초고를 쓰고, 부크크로 0원 출판해 네이버 공식 작가가 됩니다!")
 
     else:
         # 모드 B: 경쟁사 분석 전용
@@ -134,6 +139,10 @@ with st.expander("🛠️ [1단계] 분석 모드 선택 및 인터넷 링크 / 
             price_sub = "12,000원"
             ebook_link = "https://bookk.co.kr/bookStore/6a35e5e5f5d317cf59a3c17e"
             paper_link = "https://search.shopping.naver.com/book/catalog/60677619152?query=%EC%97%90%EC%84%B8%EC%9D%B4%20%ED%95%9C%20%EA%B6%8C%EC%9C%BC%EB%A1%9C%20%EB%8B%B9%EC%8B%A0%EC%9D%84%20%EC%A6%9D%EB%AA%85%ED%95%98%EB%9D%BC&NaPm=ct%3Dmv6528i8%7Cci%3D2dc082a4012fc5a426416cd172e3906ba5165b26%7Ctr%3Dboksl%7Csn%3D95694%7Chk%3D094ce9625fa67ab6bf58f1ebe3cedb0fae84df84"
+            custom_h1 = "이력서 100장보다 강력한 내 이름의 책 한 권,"
+            custom_h2 = f"『{prod_title.split('(')[0].strip() or '내 책'}』로 완벽하게 증명하세요."
+            custom_pain = '"내세울 스펙도 없고 글솜씨도 없는데, 내가 과연 책을 쓸 수 있을까?"'
+            custom_sol = "뼈대만 던져주면 AI가 초고를 쓰고, 부크크로 0원 출판해 네이버 공식 작가가 됩니다!"
 
     st.markdown("---")
     st.markdown("#### ⚖️ [2단계] 마케팅 진실성 & 조건부 섹션 제어 (허위 후기 방지 & 맞춤 구성)")
@@ -212,6 +221,11 @@ with st.expander("🛠️ [1단계] 분석 모드 선택 및 인터넷 링크 / 
                 "author": prod_author,
                 "ebook_link": ebook_link,
                 "paper_link": paper_link,
+                "target_audience": target_audience,
+                "headline_1": custom_h1,
+                "headline_2": custom_h2,
+                "pain_title": custom_pain,
+                "sol_title": custom_sol,
                 "review_mode": review_mode,
                 "custom_reviews": custom_reviews_payload,
                 "has_comparison": has_comparison,

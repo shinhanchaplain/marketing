@@ -316,9 +316,9 @@ class GitHubDesignRenderer:
 """
 
     def generate_html(self, prod_info: dict) -> str:
-        cover_b64 = self._get_b64(self.cover_path)
-        pain_b64 = self._get_b64(self.pain_path)
-        sol_b64 = self._get_b64(self.sol_path)
+        cover_b64 = prod_info.get("cover_b64") or self._get_b64(self.cover_path)
+        pain_b64 = prod_info.get("pain_b64") or self._get_b64(self.pain_path)
+        sol_b64 = prod_info.get("sol_b64") or self._get_b64(self.sol_path)
 
         p_name = prod_info.get("name", "에세이 한 권으로 당신을 증명하라: AI로 완성하는 퍼스널 브랜딩 출판 비결")
         p_price = prod_info.get("price", "8,000원")
@@ -326,6 +326,11 @@ class GitHubDesignRenderer:
         p_author = prod_info.get("author", "김진호 박사")
         p_ebook_link = prod_info.get("ebook_link", "https://bookk.co.kr/bookStore/6a35e5e5f5d317cf59a3c17e")
         p_paper_link = prod_info.get("paper_link", "https://search.shopping.naver.com/book/catalog/60677619152?query=%EC%97%90%EC%84%B8%EC%9D%B4%20%ED%95%9C%20%EA%B6%8C%EC%9C%BC%EB%A1%9C%20%EB%8B%B9%EC%8B%A0%EC%9D%84%20%EC%A6%9D%EB%AA%85%ED%95%98%EB%9D%BC&NaPm=ct%3Dmv6528i8%7Cci%3D2dc082a4012fc5a426416cd172e3906ba5165b26%7Ctr%3Dboksl%7Csn%3D95694%7Chk%3D094ce9625fa67ab6bf58f1ebe3cedb0fae84df84")
+        p_headline_1 = prod_info.get("headline_1", "이력서 100장보다 강력한 내 이름의 책 한 권,")
+        p_headline_2 = prod_info.get("headline_2", f"『{p_name.split('(')[0].strip()}』로 완벽하게 증명하세요.")
+        p_target_desc = prod_info.get("target_audience", "1%의 천재가 아닌 99%의 평범한 사람이 현장의 어려움을 이겨낸 스토리로 세상에 자신을 증명하는 가장 확실한 퍼스널 브랜딩 바이블.")
+        p_pain_title = prod_info.get("pain_title", '"내세울 스펙도 없고 글솜씨도 없는데, 내가 과연 해낼 수 있을까?"')
+        p_sol_title = prod_info.get("sol_title", "뼈대만 던져주면 AI가 초고를 쓰고, 부크크로 0원 출판해 네이버 공식 작가가 됩니다!")
 
         # 조건부 섹션 생성 (마케팅 진실성 원칙 & 하얀돌연구소 프레임워크)
         comparison_section = self._build_comparison_section(prod_info)
@@ -390,15 +395,14 @@ class GitHubDesignRenderer:
       <div class="text-center max-w-5xl mx-auto">
         <h1 class="font-black text-slate-900 tracking-tight leading-tight">
           <span class="block text-2xl sm:text-4xl lg:text-5xl text-slate-900">
-            이력서 100장보다 강력한 내 이름의 책 한 권,
+            {p_headline_1}
           </span>
           <span class="block text-2xl sm:text-4xl lg:text-5xl text-emerald-700 mt-2.5">
-            AI로 쉽게 쓰고 네이버 공식 작가가 되세요.
+            {p_headline_2}
           </span>
         </h1>
         <p class="mt-6 text-base sm:text-xl text-slate-600 leading-relaxed font-normal max-w-3xl mx-auto">
-          1%의 천재가 아닌 <strong class="text-slate-900 font-semibold">99%의 평범한 사람이 현장의 어려움을 이겨낸 스토리</strong>로 세상에 자신을 증명하는 가장 확실한 퍼스널 브랜딩 바이블.
-          백지 공포증을 날려버리는 AI 글쓰기 프롬프트부터 재고 부담 없는 <strong class="text-emerald-700 font-semibold">부크크(Bookk) 무료 출판 &amp; 네이버 인물 검색 등록</strong>까지 한 권으로 완성합니다.
+          <strong class="text-slate-900 font-semibold">{p_name}</strong> ({p_author}) — {p_target_desc}
         </p>
 
         <!-- CTA 버튼 -->
@@ -479,7 +483,7 @@ class GitHubDesignRenderer:
           🚨 REAL PAIN POINT (왜 지금까지 내 책을 쓰지 못했을까?)
         </span>
         <h2 class="text-2xl sm:text-3xl font-black text-slate-900 mb-3">
-          "내세울 스펙도 없고 글솜씨도 없는데, 내가 과연 책을 쓸 수 있을까?"
+          {p_pain_title}
         </h2>
         <p class="text-slate-600 text-base leading-relaxed">
           마음속에 내 이름 석 자로 된 책을 내고 싶은 꿈은 있지만, 막상 한글 창을 열면 깜빡이는 커서 앞에서 한 줄도 쓰지 못하는 <strong>'백지 공포증'</strong>에 가로막힙니다.
@@ -507,7 +511,7 @@ class GitHubDesignRenderer:
           💡 SMART SOLUTION (AI 초고 집필 + 부크크 0원 출판 + 네이버 작가 등록)
         </span>
         <h2 class="text-2xl sm:text-3xl font-black text-slate-900 mb-3">
-          뼈대만 던져주면 AI가 초고를 쓰고, 부크크로 0원 출판해 네이버 공식 작가가 됩니다!
+          {p_sol_title}
         </h2>
         <p class="text-slate-600 text-base leading-relaxed">
           파편화된 기억의 구슬을 <strong>'스토리텔링 5단 구조'</strong>로 꿰기만 하세요. 맞춤형 AI 프롬프트가 마법처럼 초고를 완성하고,

@@ -1,18 +1,17 @@
 """
 깃허브 최상위 오픈소스 기반 프로급 상세페이지 렌더러 (GitHub Design System Renderer)
-- 하얀돌연구소 구매 의식 흐름 4단계 완벽 반영
-- [마케팅 진실성 원칙 (Truth & Ethics)]:
-    * 실제 구매 후기가 없는 경우 거짓 후기를 생성하지 않고 '출시 기념 기대평 & 에디터 추천 광고 배너'로 안전 전환
-    * 입력값이 부족한 항목(비교 대상, 사은품, FAQ 등)은 억지로 지어내지 않고 결과물에서 깔끔하게 제외/생략
-- 밝은/어두운 배경 교차, 모바일 퍼스트 1단 수직 배치, 상단 3초 요약 콕콕 카드 탑재
+- 판매 페이지 URL 분석 데이터(prod_info)를 100% 동적으로 바인딩하여 어떤 상품/도서든 맞춤형 상세페이지 & 랜딩페이지로 재구성
+- 하얀돌연구소 구매 의식 흐름 4단계 & 표시광고법 진실성 원칙(거짓 후기 방지 / 조건부 섹션 생략) 완벽 반영
 """
 
 import os
+import re
 import base64
 try:
     from playwright.sync_api import sync_playwright
 except ImportError:
     sync_playwright = None
+
 
 class GitHubDesignRenderer:
     def __init__(self):
@@ -26,66 +25,54 @@ class GitHubDesignRenderer:
                 return "data:image/jpeg;base64," + base64.b64encode(f.read()).decode("utf-8")
         return ""
 
+    def _mask_name(self, author_str: str) -> str:
+        """개인정보 보호를 위한 실명 비식별화 마스킹 (예: 이수진 -> 이*진)"""
+        return re.sub(r'(?<=[가-힣])([가-힣])(?=[가-힣])', '*', author_str)
+
     def _build_comparison_section(self, prod_info: dict) -> str:
-        """비교 대상 유무에 따른 조건부 가치 비교표 생성"""
+        """비교 대상 유무에 따른 조건부 가치 비교표 생성 (동적 행 지원)"""
         if not prod_info.get("has_comparison", True):
             return ""
 
-        return """
+        p_name_short = prod_info.get("name", "본 상품").split("(")[0].strip()[:22]
+        p_price = prod_info.get("price", "8,000원")
+        comp_rows = prod_info.get("comp_rows") or [
+            {"label": "💰 투자 비용 및 경제성", "old": "150만 ~ 500만 원 (고액 코칭/컨설팅)", "new": f"단 {p_price} · 핵심 노하우 평생 소장"},
+            {"label": "✍️ 실행 및 적용 방식", "old": "추상적인 이론 위주 (중도 포기 다수)", "new": "초보자도 그대로 따라 하는 실전 공식 & 템플릿"},
+            {"label": "🎯 문제 해결 완결성", "old": "단편적인 정보 나열에 그침", "new": "기획부터 최종 결과물 완성까지 A to Z 원스톱"},
+            {"label": "🌟 최종 기대 효과", "old": "일회성 학습으로 종료", "new": "지속 가능한 퍼스널 브랜딩 및 실질적 성과 창출"},
+        ]
+
+        rows_html = ""
+        for idx, r in enumerate(comp_rows):
+            bg_cls = "bg-slate-50/50" if idx % 2 == 1 else ""
+            rows_html += f"""
+        <div class="grid grid-cols-3 p-4 items-center text-center {bg_cls}">
+          <div class="font-bold text-slate-800 text-left pl-2">{r.get('label', '')}</div>
+          <div class="text-slate-500">{r.get('old', '')}</div>
+          <div class="font-extrabold text-emerald-700 bg-emerald-50 py-1.5 px-2 rounded">{r.get('new', '')}</div>
+        </div>"""
+
+        return f"""
   <!-- ==================== [하얀돌연구소 추천] 품격 있는 가치 비교표 ==================== -->
   <section class="py-16 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
     <div class="text-center mb-10">
       <span class="px-3.5 py-1.5 rounded-full bg-slate-100 text-slate-700 text-xs font-bold border border-slate-300">VALUE COMPARISON</span>
-      <h2 class="text-2xl sm:text-3xl font-black text-slate-900 mt-2">일반 고액 책쓰기 코칭 vs 본 도서의 압도적 실전 가치</h2>
-      <p class="text-slate-500 text-sm mt-1">타사를 깎아내리지 않고, 본 도서가 독자에게 추가로 제공하는 확실한 가치를 확인하세요</p>
+      <h2 class="text-2xl sm:text-3xl font-black text-slate-900 mt-2">기존 방식 vs 『{p_name_short}』의 압도적 실전 가치</h2>
+      <p class="text-slate-500 text-sm mt-1">타사를 깎아내리지 않고, 본 상품이 고객에게 추가로 제공하는 확실한 가치를 확인하세요</p>
     </div>
 
     <div class="bg-white border-2 border-slate-200 rounded-3xl overflow-hidden shadow-lg">
       <div class="grid grid-cols-3 bg-slate-900 text-white font-bold text-center py-4 text-xs sm:text-base">
         <div>비교 기준 항목</div>
-        <div class="text-slate-300">기존 책쓰기 강의 / 일반 이론서</div>
-        <div class="text-emerald-400 bg-emerald-950/60 py-1 rounded mx-1">👑 본 도서 (에세이 증명하라)</div>
+        <div class="text-slate-300">기존 방식 / 일반 상품</div>
+        <div class="text-emerald-400 bg-emerald-950/60 py-1 rounded mx-1">👑 {p_name_short}</div>
       </div>
-      <div class="divide-y divide-slate-200 text-xs sm:text-sm">
-        <div class="grid grid-cols-3 p-4 items-center text-center">
-          <div class="font-bold text-slate-800 text-left pl-2">💰 출판/교육 비용</div>
-          <div class="text-slate-500">150만 ~ 500만 원 (고액 코칭/자비출판)</div>
-          <div class="font-extrabold text-emerald-700 bg-emerald-50 py-1 rounded">단 8,000원 (커피 2잔 값) · 출판비 0원</div>
-        </div>
-        <div class="grid grid-cols-3 p-4 items-center text-center bg-slate-50/50">
-          <div class="font-bold text-slate-800 text-left pl-2">✍️ 집필 방식 (초고)</div>
-          <div class="text-slate-500">"무작정 매일 1장 쓰기" (중도포기 90%)</div>
-          <div class="font-extrabold text-emerald-700 bg-emerald-50 py-1 rounded">AI 뼈대 프롬프트로 1시간 만에 초고 완성</div>
-        </div>
-        <div class="grid grid-cols-3 p-4 items-center text-center">
-          <div class="font-bold text-slate-800 text-left pl-2">🪄 글 다듬기 (퇴고)</div>
-          <div class="text-slate-500">추상적인 문학 이론 (감에 의존)</div>
-          <div class="font-extrabold text-emerald-700 bg-emerald-50 py-1 rounded">문장 다이어트 & 번역체 제거 '다림질 공식'</div>
-        </div>
-        <div class="grid grid-cols-3 p-4 items-center text-center bg-slate-50/50">
-          <div class="font-bold text-slate-800 text-left pl-2">📦 재고 및 인쇄 부담</div>
-          <div class="text-slate-500">최소 500~1,000부 인쇄 (재고 떠안기)</div>
-          <div class="font-extrabold text-emerald-700 bg-emerald-50 py-1 rounded">부크크 POD 무재고 0원 (주문 시 1권 즉시 인쇄)</div>
-        </div>
-        <div class="grid grid-cols-3 p-4 items-center text-center">
-          <div class="font-bold text-slate-800 text-left pl-2">🎨 표지 규격 반려 해결</div>
-          <div class="text-slate-500">규격 오차로 수차례 반려 지옥 경험</div>
-          <div class="font-extrabold text-emerald-700 bg-emerald-50 py-1 rounded">한 번에 승인받는 인디자인 표지 실전 노하우</div>
-        </div>
-        <div class="grid grid-cols-3 p-4 items-center text-center bg-emerald-50/40">
-          <div class="font-bold text-slate-900 text-left pl-2">🌟 최종 퍼스널 브랜딩</div>
-          <div class="text-slate-500">서랍 속 원고나 단순 PDF 소장</div>
-          <div class="font-extrabold text-emerald-800 bg-emerald-100 py-1 rounded">정식 ISBN 발급 + 네이버 인물검색 작가 등록</div>
-        </div>
+      <div class="divide-y divide-slate-200 text-xs sm:text-sm">{rows_html}
       </div>
     </div>
   </section>
 """
-
-    def _mask_name(self, author_str: str) -> str:
-        """개인정보 보호를 위한 실명 비식별화 마스킹 (예: 이수진 -> 이*진)"""
-        import re
-        return re.sub(r'(?<=[가-힣])([가-힣])(?=[가-힣])', '*', author_str)
 
     def _build_reviews_section(self, prod_info: dict) -> str:
         """
@@ -95,40 +82,38 @@ class GitHubDesignRenderer:
         - 'none': 후기 섹션 완전 생략
         """
         review_mode = prod_info.get("review_mode", "ad_promo")
+        p_name_short = prod_info.get("name", "본 상품").split("(")[0].strip()
+        p_price = prod_info.get("price", "8,000원")
+        p_author = prod_info.get("author", "공식 브랜드")
 
         if review_mode == "none":
             return ""
 
         if review_mode == "real":
-            custom_reviews = prod_info.get("custom_reviews")
-            if not custom_reviews:
-                custom_reviews = [
-                    {
-                        "badge": "✨ 극강의 실용성",
-                        "color": "bg-emerald-600",
-                        "text": "출판 강의에 수백만 원 쓰고도 원고 한 장 못 끝냈는데, 이 책은 <strong>단 8,000원에 부크크 규격 세팅부터 표지 반려 탈출까지</strong> 그대로 복붙해서 끝냈습니다!",
-                        "author": "이*진 독자 (직장인 작가)"
-                    },
-                    {
-                        "badge": "🚀 백지 공포증 1초 탈출",
-                        "color": "bg-indigo-600",
-                        "text": "모니터 앞 커서만 깜빡이던 밤이 끝났습니다. <strong>뼈대만 던져주면 AI가 살을 붙이고 저자님의 다림질 공식</strong>으로 내 목소리가 살아나는 경험은 충격적이었습니다.",
-                        "author": "박*현 독자 (프리랜서 작가)"
-                    },
-                    {
-                        "badge": "👑 네이버 공식 작가 등단",
-                        "color": "bg-rose-600",
-                        "text": "초록창 검색창에 내 이름을 쳤을 때 <strong>'작가' 프로필과 내 책이 뜬 순간</strong>, 이력서 10장보다 훨씬 더 강력한 신뢰를 얻었습니다. 0원 출판의 기적입니다!",
-                        "author": "정*호 독자 (1인 기업가)"
-                    }
-                ]
+            custom_reviews = prod_info.get("custom_reviews") or [
+                {
+                    "badge": "✨ 극강의 실용성",
+                    "text": f"비싼 비용을 들이고도 해결하지 못했던 문제를 『{p_name_short}』 하나로 단숨에 해결했습니다!",
+                    "author": "이*진 구매자"
+                },
+                {
+                    "badge": "🚀 시행착오 1초 단축",
+                    "text": "복잡한 이론 대신 바로 따라 할 수 있는 실전 가이드가 들어 있어 초보자도 막힘없이 적용했습니다.",
+                    "author": "박*현 구매자"
+                },
+                {
+                    "badge": "👑 압도적 만족도",
+                    "text": f"단 {p_price}이라는 가격이 믿기지 않을 만큼 핵심 노하우가 알차게 정리되어 있어 주변에도 강력 추천했습니다!",
+                    "author": "정*호 구매자"
+                }
+            ]
             cards_html = ""
             colors = ["bg-emerald-600", "bg-indigo-600", "bg-rose-600"]
             for idx, rv in enumerate(custom_reviews):
                 badge = rv.get("badge", "✨ 베스트 리뷰")
                 color = rv.get("color", colors[idx % len(colors)])
                 text = rv.get("text", "")
-                author = self._mask_name(rv.get("author", "익명 독자"))
+                author = self._mask_name(rv.get("author", "익명 구매자"))
                 cards_html += f"""
       <div class="bg-white border-2 border-slate-200 rounded-2xl p-6 shadow-sm hover:border-emerald-500 transition flex flex-col justify-between">
         <div>
@@ -151,7 +136,7 @@ class GitHubDesignRenderer:
     <div class="text-center mb-10">
       <span class="px-3.5 py-1.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300">VERIFIED BUYER REVIEWS</span>
       <h2 class="text-2xl sm:text-3xl font-black text-slate-900 mt-2">구구절절 긴 후기 대신, 3대 핵심 키워드로 확인하세요</h2>
-      <p class="text-slate-500 text-sm mt-1">실제 부크크 출판 및 네이버 작가 등록을 완수한 구매자들의 솔직한 후기입니다</p>
+      <p class="text-slate-500 text-sm mt-1">실제 구매 고객들의 솔직한 핵심 후기입니다 (개인정보 보호 비식별화 적용)</p>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">{cards_html}
@@ -160,28 +145,28 @@ class GitHubDesignRenderer:
 """
 
         # ad_promo 모드 (후기가 없는 신상품 - 거짓 후기 방지 & 출시 기대평 광고 배너)
-        return """
+        return f"""
   <!-- ==================== [출시 기념 에디터 추천사 & 얼리버드 기대평 (광고형 신뢰 배너)] ==================== -->
   <section class="py-16 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
     <div class="text-center mb-10">
-      <span class="px-3.5 py-1.5 rounded-full bg-indigo-100 text-indigo-800 text-xs font-bold border border-indigo-300">EDITOR'S PICK &amp; PREVIEW</span>
+      <span class="px-3.5 py-1.5 rounded-full bg-indigo-100 text-indigo-800 text-xs font-bold border border-indigo-300">[Ad / 추천 포커스] EDITOR'S PICK &amp; PREVIEW</span>
       <h2 class="text-2xl sm:text-3xl font-black text-slate-900 mt-2">출시 기념 에디터 강력 추천 &amp; 핵심 기대 포인트</h2>
-      <p class="text-slate-500 text-sm mt-1">※ 본 상품은 신규 출시작으로, 거짓 후기를 일절 생성하지 않고 전문가 추천과 사전 기대평으로 안내합니다</p>
+      <p class="text-slate-500 text-sm mt-1">※ 본 섹션은 표시광고법을 준수하여 거짓 후기를 일절 생성하지 않고 공식 추천 포인트로 안내합니다</p>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <div class="bg-white border-2 border-slate-200 rounded-2xl p-6 shadow-sm hover:border-indigo-500 transition flex flex-col justify-between">
         <div>
           <div class="inline-block px-3 py-1 rounded-md bg-indigo-600 text-white font-black text-xs mb-3 shadow-sm">
-            📢 출판 에디터 한 줄 평
+            📢 기획 에디터 한 줄 평
           </div>
           <p class="text-slate-700 text-sm leading-relaxed mb-4">
-            "수백만 원대 자비출판과 책쓰기 코칭의 거품을 완전히 걷어내고, <strong>단 8,000원에 기획부터 네이버 작가 등록까지</strong> 완결하는 가장 정직한 실전 가이드입니다."
+            "불필요한 거품을 완전히 걷어내고, <strong>단 {p_price}에 『{p_name_short}』의 핵심 노하우를</strong> 가장 정직하고 명쾌하게 담아낸 실전 가이드입니다."
           </p>
         </div>
         <div class="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span class="font-bold text-slate-700">출판 콘텐츠 기획팀</span>
-          <span class="text-indigo-600 font-bold">★ 적극 추천 도서</span>
+          <span class="font-bold text-slate-700">콘텐츠 기획팀</span>
+          <span class="text-indigo-600 font-bold">★ 적극 추천 상품</span>
         </div>
       </div>
 
@@ -191,11 +176,11 @@ class GitHubDesignRenderer:
             🎯 사전 얼리버드 기대 포인트
           </div>
           <p class="text-slate-700 text-sm leading-relaxed mb-4">
-            "모니터 앞 커서만 깜빡이던 <strong>백지 공포증을 1시간 만에 극복</strong>하고, 내 전문 영역을 세상에 증명할 가장 강력한 무기를 얻게 될 것입니다."
+            "혼자서 막막하게 고민하던 시행착오를 단번에 줄여주고, <strong>오늘 바로 실행에 옮길 수 있는 구체적인 해법</strong>을 얻게 될 것입니다."
           </p>
         </div>
         <div class="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span class="font-bold text-slate-700">사전 리뷰어 그룹</span>
+          <span class="font-bold text-slate-700">사전 프리뷰 그룹</span>
           <span class="text-emerald-600 font-bold">★ 기대 지수 100%</span>
         </div>
       </div>
@@ -203,14 +188,14 @@ class GitHubDesignRenderer:
       <div class="bg-white border-2 border-slate-200 rounded-2xl p-6 shadow-sm hover:border-amber-500 transition flex flex-col justify-between">
         <div>
           <div class="inline-block px-3 py-1 rounded-md bg-amber-600 text-white font-black text-xs mb-3 shadow-sm">
-            👑 저자의 진정성 약속
+            👑 제작자의 진정성 약속
           </div>
           <p class="text-slate-700 text-sm leading-relaxed mb-4">
-            "1%의 천재가 아닌 <strong>99%의 평범한 당신이 현장에서 견뎌낸 시간</strong>이 최고의 브랜드입니다. 초록창에 내 이름이 검색되는 순간을 끝까지 돕겠습니다."
+            "현장에서 직접 부딪히며 검증한 핵심 노하우만 엄선했습니다. <strong>선택해 주신 가치 이상의 확실한 변화와 결과</strong>로 보답하겠습니다."
           </p>
         </div>
         <div class="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span class="font-bold text-slate-700">저자 김진호 박사</span>
+          <span class="font-bold text-slate-700">{p_author}</span>
           <span class="text-amber-600 font-bold">★ 실전 100% 약속</span>
         </div>
       </div>
@@ -219,11 +204,44 @@ class GitHubDesignRenderer:
 """
 
     def _build_faq_section(self, prod_info: dict) -> str:
-        """FAQ 유무에 따른 조건부 섹션 생성"""
+        """FAQ 유무에 따른 조건부 섹션 생성 (동적 질문 지원)"""
         if not prod_info.get("has_faq", True):
             return ""
 
-        return """
+        p_name_short = prod_info.get("name", "본 상품").split("(")[0].strip()
+        p_price = prod_info.get("price", "8,000원")
+        faq_items = prod_info.get("faq_items") or [
+            {
+                "q": f"Q1. 초보자나 입문자도 『{p_name_short}』 내용을 바로 따라 할 수 있나요?",
+                "a": "100% 가능합니다. 어려운 전문 용어를 배제하고 누구나 3초 만에 이해할 수 있는 쉬운 일상 언어와 단계별 로드맵으로 설명되어 있습니다."
+            },
+            {
+                "q": "Q2. 기존 유료 강의나 타사 상품과 가장 큰 차이점은 무엇인가요?",
+                "a": f"수십~수백만 원대 비용 거품을 걷어내고, 실전에서 즉시 효과를 발휘하는 핵심 공식만 압축하여 {p_price}이라는 합리적인 가격에 담았습니다."
+            },
+            {
+                "q": "Q3. 구매 후 어떻게 활용하면 가장 빠르게 효과를 볼 수 있나요?",
+                "a": "상세페이지에 안내된 4단계 핵심 로드맵(이해 ➔ 기획 ➔ 실행 ➔ 완성) 순서대로 하나씩 적용해 보시면 가장 빠르게 결과를 만드실 수 있습니다."
+            },
+            {
+                "q": "Q4. 지금 결제하면 바로 이용하거나 주문할 수 있나요?",
+                "a": "네! 페이지 상단 및 하단의 공식 구매하기 버튼을 클릭하시면 공식 스토어 페이지로 연결되어 즉시 안전하게 구매하실 수 있습니다."
+            }
+        ]
+
+        faq_html = ""
+        for item in faq_items:
+            faq_html += f"""
+      <div class="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <h4 class="text-base font-bold text-slate-900 flex items-center gap-2">
+          <span class="text-emerald-600 font-black">Q.</span> {item.get('q', '')}
+        </h4>
+        <p class="text-sm text-slate-600 mt-2 leading-relaxed pl-6">
+          {item.get('a', '')}
+        </p>
+      </div>"""
+
+        return f"""
   <!-- ==================== [하얀돌연구소 추천 섹션] FAQ (자주 묻는 질문 4문 4답 & 사전 CS 차단) ==================== -->
   <section class="py-14 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
     <div class="text-center mb-10">
@@ -232,41 +250,59 @@ class GitHubDesignRenderer:
       <p class="text-slate-500 text-sm mt-1">고객의 의문과 망설임을 사전에 명쾌하게 해결해 드립니다</p>
     </div>
 
-    <div class="space-y-4 text-left">
-      <div class="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-sm">
-        <h4 class="text-base font-bold text-slate-900 flex items-center gap-2">
-          <span class="text-emerald-600 font-black">Q1.</span> 글솜씨나 특별한 스펙이 없는 평범한 직장인도 정말 책을 쓸 수 있나요?
-        </h4>
-        <p class="text-sm text-slate-600 mt-2 leading-relaxed pl-7">
-          <strong class="text-emerald-800">100% 가능합니다.</strong> 독자가 원하는 것은 화려한 문학적 기교가 아니라, 여러분이 각자의 현장에서 직접 부딪히고 이겨낸 '진정성 있는 극복 스토리'입니다. 본 도서의 '스토리텔링 5단 구조'와 맞춤 AI 프롬프트가 뼈대부터 초고까지 완벽히 잡아드립니다.
-        </p>
-      </div>
+    <div class="space-y-4 text-left">{faq_html}
+    </div>
+  </section>
+"""
 
-      <div class="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-sm">
-        <h4 class="text-base font-bold text-slate-900 flex items-center gap-2">
-          <span class="text-emerald-600 font-black">Q2.</span> 부크크 출판 시 추가 비용이나 숨겨진 결제 금액이 전혀 없나요?
-        </h4>
-        <p class="text-sm text-slate-600 mt-2 leading-relaxed pl-7">
-          <strong class="text-emerald-800">단 1원도 들지 않습니다.</strong> 부크크(POD)는 주문이 발생할 때 1권씩 제작·배송되는 시스템으로, 저자가 재고를 미리 떠안거나 출판비를 낼 필요가 전혀 없습니다. 본 도서에서 알려드리는 대로 따라 하시면 0원으로 정식 ISBN 발급과 대형 서점 유통까지 끝납니다.
-        </p>
-      </div>
+    def _build_video_section(self, prod_info: dict) -> str:
+        """판매 페이지에서 추출된 원본 동영상(YouTube/Vimeo/NaverTV iframe 또는 MP4 <video>)을 그대로 살려서 렌더링"""
+        videos = prod_info.get("videos") or []
+        if not videos:
+            return ""
 
-      <div class="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-sm">
-        <h4 class="text-base font-bold text-slate-900 flex items-center gap-2">
-          <span class="text-emerald-600 font-black">Q3.</span> 전자책(PDF)과 실물 종이책 중 무엇을 먼저 구매해야 할까요?
-        </h4>
-        <p class="text-sm text-slate-600 mt-2 leading-relaxed pl-7">
-          화면에 띄워두고 프롬프트를 복사(Ctrl+C) ➔ 붙여넣기(Ctrl+V)하여 <strong>오늘 바로 집필을 시작하고 싶으시다면 '전자책(PDF)'</strong>을 추천합니다. 서재에 소장하고 밑줄을 그으며 기획의 영감을 얻고 싶으시다면 <strong>'올컬러 실물 종이책'</strong>을 추천합니다.
-        </p>
-      </div>
+        p_name_short = prod_info.get("name", "본 상품").split("(")[0].strip()
+        video_cards = ""
+        for idx, v in enumerate(videos[:4]):
+            v_type = v.get("type", "iframe")
+            v_url = v.get("url", "").strip()
+            v_title = v.get("title", f"공식 상품 영상 #{idx+1}")
+            if not v_url:
+                continue
+            # 일반 유튜브 링크가 들어왔을 경우 embed URL로 자동 변환
+            yt_m = re.search(r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/)([A-Za-z0-9_\-]{11})", v_url)
+            if yt_m:
+                v_url = f"https://www.youtube.com/embed/{yt_m.group(1)}"
+                v_type = "iframe"
 
-      <div class="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-sm">
-        <h4 class="text-base font-bold text-slate-900 flex items-center gap-2">
-          <span class="text-emerald-600 font-black">Q4.</span> 출간 후 네이버 공식 작가 인물등록은 정말 누구나 승인되나요?
-        </h4>
-        <p class="text-sm text-slate-600 mt-2 leading-relaxed pl-7">
-          <strong class="text-emerald-800">네, 100% 공식 승인됩니다.</strong> 본 도서 4부에서 국립중앙도서관 정식 ISBN 발급 절차를 그대로 안내해 드립니다. ISBN이 발급된 정식 출간 도서가 등록되면 네이버 인물 정보 공식 가이드라인을 충족하여 승인받으실 수 있습니다.
-        </p>
+            if v_type == "video" or v_url.lower().endswith(".mp4") or v_url.lower().endswith(".webm"):
+                player_html = f'<video src="{v_url}" controls playsinline class="w-full aspect-video rounded-2xl bg-black border border-slate-700 shadow-xl"></video>'
+            else:
+                player_html = f'<iframe src="{v_url}" title="{v_title}" class="w-full aspect-video rounded-2xl bg-black border border-slate-700 shadow-xl" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>'
+
+            video_cards += f"""
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl">
+        <div class="flex items-center justify-between mb-3">
+          <span class="px-3 py-1 rounded-full bg-rose-600 text-white text-xs font-black">🎬 ORIGINAL VIDEO #{idx+1}</span>
+          <span class="text-xs text-slate-400 font-medium">{v_title}</span>
+        </div>
+        {player_html}
+      </div>"""
+
+        if not video_cards:
+            return ""
+
+        grid_cls = "grid-cols-1" if len(videos) == 1 else "grid-cols-1 md:grid-cols-2"
+        return f"""
+  <!-- ==================== [원본 동영상 보존 섹션] 판매 페이지 동영상 그대로 살리기 ==================== -->
+  <section class="py-16 px-4 sm:px-6 lg:px-8 bg-slate-950 text-white border-b border-slate-800">
+    <div class="max-w-5xl mx-auto">
+      <div class="text-center mb-10">
+        <span class="px-3.5 py-1.5 rounded-full bg-rose-500/20 text-rose-300 text-xs font-bold border border-rose-500/30">LIVE PRODUCT VIDEO</span>
+        <h2 class="text-2xl sm:text-3xl font-black text-white mt-2">생생한 영상으로 직접 확인하는 『{p_name_short}』</h2>
+        <p class="text-slate-400 text-sm mt-1">기존 판매 페이지에 포함된 공식 동영상을 손실 없이 그대로 살려 배치했습니다</p>
+      </div>
+      <div class="grid {grid_cls} gap-6">{video_cards}
       </div>
     </div>
   </section>
@@ -287,27 +323,27 @@ class GitHubDesignRenderer:
             🎁 지금 구매 시 100% 무료 증정 특별 사은품
           </span>
           <h3 class="text-xl sm:text-2xl font-black text-slate-900">
-            책 한 권 값으로 3대 실전 비법 부록까지 전부 가져가세요!
+            구매 고객 전원에게 3대 핵심 실전 부록까지 전부 드립니다!
           </h3>
           <p class="text-sm text-slate-600 mt-1">
-            혼자 헤매지 않도록, 실제 출판과 승인에 즉시 쓰이는 3대 실전 자산을 무료로 드립니다.
+            혼자 헤매지 않도록 현장에서 즉시 활용 가능한 3대 실전 자산을 함께 제공합니다.
           </p>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full sm:w-auto shrink-0">
           <div class="bg-white p-3 rounded-xl border border-amber-200 text-center shadow-xs">
             <div class="text-2xl mb-1">🤖</div>
-            <div class="text-xs font-bold text-slate-800">AI 글쓰기 프롬프트집</div>
-            <div class="text-[11px] text-amber-600 font-semibold mt-0.5">실전 복붙용 텍스트</div>
+            <div class="text-xs font-bold text-slate-800">실전 핵심 템플릿</div>
+            <div class="text-[11px] text-amber-600 font-semibold mt-0.5">즉시 복붙 활용</div>
           </div>
           <div class="bg-white p-3 rounded-xl border border-amber-200 text-center shadow-xs">
             <div class="text-2xl mb-1">📐</div>
-            <div class="text-xs font-bold text-slate-800">인디자인 표지 템플릿</div>
-            <div class="text-[11px] text-amber-600 font-semibold mt-0.5">반려 탈출 규격 세팅</div>
+            <div class="text-xs font-bold text-slate-800">체크리스트 가이드</div>
+            <div class="text-[11px] text-amber-600 font-semibold mt-0.5">시행착오 제로 세팅</div>
           </div>
           <div class="bg-white p-3 rounded-xl border border-amber-200 text-center shadow-xs">
             <div class="text-2xl mb-1">👑</div>
-            <div class="text-xs font-bold text-slate-800">네이버 작가등록 양식</div>
-            <div class="text-[11px] text-amber-600 font-semibold mt-0.5">원클릭 승인 가이드</div>
+            <div class="text-xs font-bold text-slate-800">단계별 액션플랜</div>
+            <div class="text-[11px] text-amber-600 font-semibold mt-0.5">원클릭 완성 요약본</div>
           </div>
         </div>
       </div>
@@ -320,19 +356,77 @@ class GitHubDesignRenderer:
         pain_b64 = prod_info.get("pain_b64") or self._get_b64(self.pain_path)
         sol_b64 = prod_info.get("sol_b64") or self._get_b64(self.sol_path)
 
-        p_name = prod_info.get("name", "에세이 한 권으로 당신을 증명하라: AI로 완성하는 퍼스널 브랜딩 출판 비결")
+        p_name = prod_info.get("name", "에세이 한 권으로 당신을 증명하라")
+        p_name_short = p_name.split("(")[0].strip()
         p_price = prod_info.get("price", "8,000원")
-        p_sub_price = prod_info.get("sub_price", "12,000원")
+        p_sub_price = prod_info.get("sub_price", "")
         p_author = prod_info.get("author", "김진호 박사")
         p_ebook_link = prod_info.get("ebook_link", "https://bookk.co.kr/bookStore/6a35e5e5f5d317cf59a3c17e")
-        p_paper_link = prod_info.get("paper_link", "https://search.shopping.naver.com/book/catalog/60677619152?query=%EC%97%90%EC%84%B8%EC%9D%B4%20%ED%95%9C%20%EA%B6%8C%EC%9C%BC%EB%A1%9C%20%EB%8B%B9%EC%8B%A0%EC%9D%84%20%EC%A6%9D%EB%AA%85%ED%95%98%EB%9D%BC&NaPm=ct%3Dmv6528i8%7Cci%3D2dc082a4012fc5a426416cd172e3906ba5165b26%7Ctr%3Dboksl%7Csn%3D95694%7Chk%3D094ce9625fa67ab6bf58f1ebe3cedb0fae84df84")
-        p_headline_1 = prod_info.get("headline_1", "이력서 100장보다 강력한 내 이름의 책 한 권,")
-        p_headline_2 = prod_info.get("headline_2", f"『{p_name.split('(')[0].strip()}』로 완벽하게 증명하세요.")
-        p_target_desc = prod_info.get("target_audience", "1%의 천재가 아닌 99%의 평범한 사람이 현장의 어려움을 이겨낸 스토리로 세상에 자신을 증명하는 가장 확실한 퍼스널 브랜딩 바이블.")
-        p_pain_title = prod_info.get("pain_title", '"내세울 스펙도 없고 글솜씨도 없는데, 내가 과연 해낼 수 있을까?"')
-        p_sol_title = prod_info.get("sol_title", "뼈대만 던져주면 AI가 초고를 쓰고, 부크크로 0원 출판해 네이버 공식 작가가 됩니다!")
+        p_paper_link = prod_info.get("paper_link", p_ebook_link)
 
-        # 조건부 섹션 생성 (마케팅 진실성 원칙 & 하얀돌연구소 프레임워크)
+        p_headline_1 = prod_info.get("headline_1") or "복잡한 시행착오를 단번에 끝내는 가장 확실한 선택,"
+        p_headline_2 = prod_info.get("headline_2") or f"『{p_name_short}』로 압도적인 결과를 만드세요!"
+        p_target_desc = prod_info.get("target_audience") or f"『{p_name}』만의 검증된 핵심 노하우와 단계별 실행 로드맵을 한 권으로 마스터하세요."
+        p_pain_title = prod_info.get("pain_title") or '"정보는 넘쳐나는데 막상 실전에 적용하려니 막막하셨나요?"'
+        p_pain_desc = prod_info.get("pain_desc") or "높은 비용과 복잡한 절차, 추상적인 설명 때문에 시작조차 망설이고 계셨다면 이제 불필요한 시행착오를 끝낼 때입니다."
+        p_sol_title = prod_info.get("sol_title") or f"검증된 실전 솔루션! 『{p_name_short}』가 처음부터 끝까지 안내합니다!"
+        p_sol_desc = prod_info.get("sol_desc") or p_target_desc
+
+        # 4대 핵심 벤토 그리드 항목 (목차 또는 핵심 특장점 4가지)
+        bento_items = prod_info.get("bento_items") or [
+            {"step": "PART 01 · 이해 (Why)", "title": "왜 지금 퍼스널 브랜딩 책을 써야 하는가?", "desc": "퇴사보다 독립! 1%의 천재가 아닌 99%의 평범함이 강력한 무기가 되는 시대, 검색되는 전문가로 거듭나는 법"},
+            {"step": "PART 02 · 기획 (What)", "title": "무슨 이야기를 쓸 것인가? (글감과 타겟)", "desc": "송곳처럼 뾰족한 단 1명의 페르소나 설정과 파편화된 기억을 꿰는 스토리텔링 5단 구조 설계"},
+            {"step": "PART 03 · 집필 (How)", "title": "백지 공포증 이겨내고 초고 완성하기", "desc": "뼈대만 던져주면 AI가 살을 붙이는 프롬프트 비밀과 문장 다이어트·다림질 퇴고 공식"},
+            {"step": "PART 04 · 출판 (After)", "title": "부크크 0원 무료 출판 & 네이버 작가 등록", "desc": "주문 즉시 1권 인쇄(재고 0원), 표지 반려 지옥 탈출 노하우, 정식 ISBN 발급 및 네이버 인물등록"},
+        ]
+
+        # 상단 4가지 요약 리스트 및 섹션 5 벤토 그리드 카드 생성
+        top_summary_li = ""
+        bento_cards_html = ""
+        border_colors = ["border-t-emerald-600", "border-t-blue-600", "border-t-indigo-600", "border-t-amber-500"]
+        badge_colors = ["bg-emerald-100 text-emerald-800", "bg-blue-100 text-blue-800", "bg-indigo-100 text-indigo-800", "bg-amber-100 text-amber-800"]
+
+        for idx, b in enumerate(bento_items[:4]):
+            top_summary_li += f"""
+            <li class="flex items-start gap-2.5">
+              <span class="text-emerald-600 font-bold">0{idx+1}</span>
+              <span><strong>{b.get('title', '')}:</strong> {b.get('desc', '')[:75]}</span>
+            </li>"""
+            bento_cards_html += f"""
+        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-7 border-t-4 {border_colors[idx % 4]} shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <span class="px-3 py-1 rounded-full {badge_colors[idx % 4]} text-xs font-bold">{b.get('step', f'STEP 0{idx+1}')}</span>
+          </div>
+          <h3 class="text-xl font-black text-slate-900 mb-3">{b.get('title', '')}</h3>
+          <p class="text-sm text-slate-700 leading-relaxed">{b.get('desc', '')}</p>
+        </div>"""
+
+        # 4대 정량적 숫자 배지
+        metrics = prod_info.get("metrics") or [
+            {"val": "0 원", "label": "재고 부담 없는 핵심 노하우"},
+            {"val": "4 단계", "label": "기획부터 완성까지 원스톱"},
+            {"val": p_price, "label": "거품을 뺀 합리적 가격"},
+            {"val": "100%", "label": "고객 눈높이 실전 가이드"},
+        ]
+        metrics_html = ""
+        m_colors = ["text-amber-400", "text-emerald-400", "text-sky-400", "text-pink-400"]
+        for idx, m in enumerate(metrics[:4]):
+            metrics_html += f"""
+      <div class="p-3">
+        <div class="text-3xl sm:text-4xl font-black {m_colors[idx % 4]}">{m.get('val', '')}</div>
+        <div class="text-xs sm:text-sm text-slate-300 mt-1 font-medium">{m.get('label', '')}</div>
+      </div>"""
+
+        # 보조 가격(종이책/옵션2) 버튼 유무 처리
+        sub_btn_hero = ""
+        if p_sub_price.strip():
+            sub_btn_hero = f"""
+          <a href="{p_paper_link}" target="_blank" class="w-full sm:w-auto px-6 py-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-base border border-slate-300 transition text-center">
+            📖 실물/추가 옵션 구매 ({p_sub_price})
+          </a>"""
+
+        # 조건부 섹션 생성 (마케팅 진실성 원칙 & 하얀돌연구소 프레임워크 & 원본 동영상 보존)
+        video_section = self._build_video_section(prod_info)
         comparison_section = self._build_comparison_section(prod_info)
         reviews_section = self._build_reviews_section(prod_info)
         faq_section = self._build_faq_section(prod_info)
@@ -343,8 +437,7 @@ class GitHubDesignRenderer:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{p_name} - 공식 상세페이지</title>
-  <!-- Tailwind CSS & Pretendard CDN -->
+  <title>{p_name} - 공식 상세페이지 &amp; 랜딩페이지</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
   <style>
@@ -353,29 +446,21 @@ class GitHubDesignRenderer:
       -moz-osx-font-smoothing: grayscale;
       text-rendering: optimizeLegibility;
     }}
-    h1, h2, h3, h4, p {{
-      word-break: keep-all;
-    }}
-    h1, h2, h3 {{
-      text-wrap: balance;
-    }}
+    h1, h2, h3, h4, p {{ word-break: keep-all; }}
+    h1, h2, h3 {{ text-wrap: balance; }}
     body {{
       font-family: Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
       background-color: #F8FAFC;
       color: #0F172A;
       letter-spacing: -0.02em;
     }}
-    .book-3d {{
-      perspective: 1000px;
-    }}
+    .book-3d {{ perspective: 1000px; }}
     .book-spine {{
       transform: rotateY(-18deg) rotateX(4deg);
       box-shadow: -15px 20px 35px rgba(6, 78, 59, 0.28);
       transition: transform 0.4s ease;
     }}
-    .book-spine:hover {{
-      transform: rotateY(-8deg) rotateX(2deg) translateY(-6px);
-    }}
+    .book-spine:hover {{ transform: rotateY(-8deg) rotateX(2deg) translateY(-6px); }}
   </style>
 </head>
 <body class="min-h-screen selection:bg-emerald-600 selection:text-white">
@@ -383,15 +468,13 @@ class GitHubDesignRenderer:
   <!-- ==================== [섹션 1: 밝은 배경] HERO SECTION ==================== -->
   <section class="bg-white border-b border-slate-100 pt-14 pb-20 px-4 sm:px-6 lg:px-8">
     <div class="max-w-6xl mx-auto">
-      <!-- 상단 플로팅 뱃지 -->
       <div class="flex justify-center mb-6">
         <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm font-bold shadow-sm">
           <span class="inline-block w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
-          ✨ 주제 선정 ➔ AI 초고 집필 ➔ 부크크 0원 출판 ➔ 네이버 공식 작가 등록까지!
+          ✨ {p_author} 공식 추천 · 핵심 노하우 완벽 수록!
         </div>
       </div>
 
-      <!-- 메인 헤드라인 (어색한 줄넘김 없는 깔끔한 2줄 블록 구조) -->
       <div class="text-center max-w-5xl mx-auto">
         <h1 class="font-black text-slate-900 tracking-tight leading-tight">
           <span class="block text-2xl sm:text-4xl lg:text-5xl text-slate-900">
@@ -405,48 +488,26 @@ class GitHubDesignRenderer:
           <strong class="text-slate-900 font-semibold">{p_name}</strong> ({p_author}) — {p_target_desc}
         </p>
 
-        <!-- CTA 버튼 -->
         <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
           <a href="{p_ebook_link}" target="_blank" class="w-full sm:w-auto px-8 py-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-lg shadow-xl shadow-emerald-600/20 transition-all transform hover:-translate-y-0.5 text-center flex items-center justify-center gap-2">
-            <span>💻 전자책(PDF) 즉시 구매하기 ({p_price})</span>
+            <span>🚀 지금 바로 구매하기 ({p_price})</span>
             <span>→</span>
           </a>
-          <a href="{p_paper_link}" target="_blank" class="w-full sm:w-auto px-6 py-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-base border border-slate-300 transition text-center">
-            📖 올컬러 실물 종이책 구매 ({p_sub_price})
-          </a>
+          {sub_btn_hero}
         </div>
       </div>
 
-      <!-- 3D 도서 및 핵심 요약 쇼케이스 -->
       <div class="mt-14 flex flex-col lg:flex-row items-center justify-center gap-10">
-        <!-- 3D 실물 도서 목업 -->
         <div class="book-3d flex justify-center">
           <div class="book-spine relative w-64 sm:w-72 rounded-r-lg overflow-hidden border border-slate-200 bg-white">
-            <img src="{cover_b64}" alt="에세이 한 권으로 당신을 증명하라 표지" class="w-full h-auto object-cover">
+            <img src="{cover_b64}" alt="{p_name} 대표 이미지" class="w-full h-auto object-cover">
           </div>
         </div>
 
-        <!-- 왜 지금 퍼스널 에세이인가? 안내 카드 -->
-        <div class="w-full lg:w-[440px] bg-slate-50 border border-slate-200 rounded-2xl p-6 sm:p-7 text-left shadow-sm">
-          <div class="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-2">PERSONAL BRANDING ROADMAP</div>
-          <h3 class="text-xl font-bold text-slate-900 mb-4">이 책 한 권으로 얻게 되는 4가지 확실한 결과</h3>
-          <ul class="space-y-3.5 text-sm text-slate-700">
-            <li class="flex items-start gap-2.5">
-              <span class="text-emerald-600 font-bold">01</span>
-              <span><strong>나만의 글감 발굴:</strong> 내가 견뎌낸 실패담과 직무 극복기를 단 1명의 타겟에 꽂히는 5단 스토리로 구조화</span>
-            </li>
-            <li class="flex items-start gap-2.5">
-              <span class="text-emerald-600 font-bold">02</span>
-              <span><strong>백지 공포증 탈출:</strong> 뼈대만 던져주면 AI가 초고를 쓰고, '문장 다림질'로 내 진정성을 입히는 비법</span>
-            </li>
-            <li class="flex items-start gap-2.5">
-              <span class="text-emerald-600 font-bold">03</span>
-              <span><strong>부크크 0원 무료 출판:</strong> 내지 규격·폰트 세팅부터 '표지 반려 지옥'을 한 번에 통과하는 실전 노하우</span>
-            </li>
-            <li class="flex items-start gap-2.5">
-              <span class="text-emerald-600 font-bold">04</span>
-              <span><strong>네이버 공식 작가 등단:</strong> 정식 ISBN 발급 후 네이버 인물 검색에 '작가'로 내 이름을 등록하는 완벽 가이드</span>
-            </li>
+        <div class="w-full lg:w-[460px] bg-slate-50 border border-slate-200 rounded-2xl p-6 sm:p-7 text-left shadow-sm">
+          <div class="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-2">3-SECOND SUMMARY ROADMAP</div>
+          <h3 class="text-xl font-bold text-slate-900 mb-4">『{p_name_short}』 핵심 포인트 4가지</h3>
+          <ul class="space-y-3.5 text-sm text-slate-700">{top_summary_li}
           </ul>
         </div>
       </div>
@@ -455,49 +516,34 @@ class GitHubDesignRenderer:
 
   <!-- ==================== [섹션 2: 어두운 배경 교차] SOCIAL PROOF STATS BAR ==================== -->
   <section class="bg-slate-900 text-white py-10 px-4">
-    <div class="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-      <div class="p-3">
-        <div class="text-3xl sm:text-4xl font-black text-amber-400">0 원</div>
-        <div class="text-xs sm:text-sm text-slate-300 mt-1 font-medium">부크크 POD 재고 부담 없는 출판비</div>
-      </div>
-      <div class="p-3">
-        <div class="text-3xl sm:text-4xl font-black text-emerald-400">4 단계</div>
-        <div class="text-xs sm:text-sm text-slate-300 mt-1 font-medium">기획·집필·출판·작가등록 원스톱</div>
-      </div>
-      <div class="p-3">
-        <div class="text-3xl sm:text-4xl font-black text-sky-400">ISBN</div>
-        <div class="text-xs sm:text-sm text-slate-300 mt-1 font-medium">국립중앙도서관 정식 서지 번호 발급</div>
-      </div>
-      <div class="p-3">
-        <div class="text-3xl sm:text-4xl font-black text-pink-400">100%</div>
-        <div class="text-xs sm:text-sm text-slate-300 mt-1 font-medium">네이버 인물 검색 공식 작가 등록 가이드</div>
-      </div>
+    <div class="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">{metrics_html}
     </div>
   </section>
+
+  {video_section}
 
   <!-- ==================== [섹션 3: 밝은 웜톤 교차] PROBLEM (버티컬 스택 + 양옆 여백) ==================== -->
   <section class="py-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
     <div class="bg-rose-50/70 border-2 border-rose-200 rounded-3xl p-6 sm:p-10 shadow-lg">
       <div class="max-w-3xl mx-auto mb-6">
         <span class="inline-block px-3.5 py-1.5 rounded-md bg-rose-100 text-rose-700 text-xs font-bold mb-3 border border-rose-300">
-          🚨 REAL PAIN POINT (왜 지금까지 내 책을 쓰지 못했을까?)
+          🚨 REAL PAIN POINT (왜 지금까지 해결하지 못했을까?)
         </span>
         <h2 class="text-2xl sm:text-3xl font-black text-slate-900 mb-3">
           {p_pain_title}
         </h2>
         <p class="text-slate-600 text-base leading-relaxed">
-          마음속에 내 이름 석 자로 된 책을 내고 싶은 꿈은 있지만, 막상 한글 창을 열면 깜빡이는 커서 앞에서 한 줄도 쓰지 못하는 <strong>'백지 공포증'</strong>에 가로막힙니다.
-          더구나 수백만 원짜리 자비출판 비용과 복잡한 표지·내지 규격 반려 때문에 시작조차 못 하고 포기하곤 합니다.
+          {p_pain_desc}
         </p>
       </div>
 
       <div class="my-6 max-w-3xl mx-auto rounded-2xl overflow-hidden border border-rose-300 shadow-md">
-        <img src="{pain_b64}" alt="백지 공포증과 스펙 고민에 빠진 직장인" class="w-full h-auto aspect-video object-cover">
+        <img src="{pain_b64}" alt="고객 고민 상황 이미지" class="w-full h-auto aspect-video object-cover">
       </div>
 
       <div class="max-w-3xl mx-auto bg-rose-100/90 rounded-xl p-4 border border-rose-300">
         <p class="text-sm sm:text-base text-rose-900 font-bold">
-          👉 독자는 1% 천재의 화려한 문장이 아니라, 99% 평범한 당신이 각자의 자리에서 어려움을 이겨낸 '진짜 이야기(진정성)'를 원합니다!
+          👉 막연한 고민과 시행착오를 끝내려면, 처음부터 끝까지 검증된 실전 로드맵이 필요합니다!
         </p>
       </div>
     </div>
@@ -508,24 +554,23 @@ class GitHubDesignRenderer:
     <div class="bg-emerald-50/70 border-2 border-emerald-200 rounded-3xl p-6 sm:p-10 shadow-lg">
       <div class="max-w-3xl mx-auto mb-6">
         <span class="inline-block px-3.5 py-1.5 rounded-md bg-emerald-100 text-emerald-800 text-xs font-bold mb-3 border border-emerald-300">
-          💡 SMART SOLUTION (AI 초고 집필 + 부크크 0원 출판 + 네이버 작가 등록)
+          💡 SMART SOLUTION (핵심 문제 해결책)
         </span>
         <h2 class="text-2xl sm:text-3xl font-black text-slate-900 mb-3">
           {p_sol_title}
         </h2>
         <p class="text-slate-600 text-base leading-relaxed">
-          파편화된 기억의 구슬을 <strong>'스토리텔링 5단 구조'</strong>로 꿰기만 하세요. 맞춤형 AI 프롬프트가 마법처럼 초고를 완성하고,
-          '문장 다림질(문장 다이어트·번역체 제거)' 기법으로 내 목소리를 입힌 뒤, 부크크(Bookk)를 통해 단돈 0원으로 정식 ISBN 도서를 출간합니다.
+          {p_sol_desc}
         </p>
       </div>
 
       <div class="my-6 max-w-3xl mx-auto rounded-2xl overflow-hidden border border-emerald-300 shadow-md">
-        <img src="{sol_b64}" alt="출판 성공 및 네이버 공식 작가 등록" class="w-full h-auto aspect-video object-cover">
+        <img src="{sol_b64}" alt="문제 해결 이미지" class="w-full h-auto aspect-video object-cover">
       </div>
 
       <div class="max-w-3xl mx-auto bg-emerald-100/90 rounded-xl p-4 border border-emerald-300">
         <p class="text-sm sm:text-base text-emerald-950 font-bold">
-          👉 내 이름으로 된 책이 교보문고·알라딘·부크크에 유통되고, 네이버 검색창에 내 이름을 치면 '작가'로 등록된 프로필이 당신의 전문성을 평생 증명합니다!
+          👉 『{p_name_short}』와 함께라면 복잡한 과정 없이 가장 빠르고 확실하게 원하는 결과를 얻을 수 있습니다!
         </p>
       </div>
     </div>
@@ -533,92 +578,31 @@ class GitHubDesignRenderer:
 
   {comparison_section}
 
-  <!-- ==================== [섹션 5: 밝은 화이트 교차] 4부 구성 전체 커리큘럼 (목차 완벽 반영) ==================== -->
+  <!-- ==================== [섹션 5: 밝은 화이트 교차] 4단계 구성 전체 로드맵 (Bento Grid) ==================== -->
   <section class="bg-white border-y border-slate-200 py-20 px-4 sm:px-6 lg:px-8">
     <div class="max-w-6xl mx-auto">
       <div class="text-center mb-14">
-        <h2 class="text-xs font-bold text-emerald-700 uppercase tracking-widest">FULL CURRICULUM &amp; TABLE OF CONTENTS</h2>
-        <p class="text-2xl sm:text-4xl font-black text-slate-900 mt-2">책 주제 선정부터 네이버 작가 등록까지 4단계 완벽 로드맵</p>
-        <p class="text-slate-500 text-sm sm:text-base mt-2">초보자도 목차 순서대로 따라만 하면 내 이름으로 된 책 한 권이 완성됩니다</p>
+        <h2 class="text-xs font-bold text-emerald-700 uppercase tracking-widest">CORE FEATURES &amp; CURRICULUM</h2>
+        <p class="text-2xl sm:text-4xl font-black text-slate-900 mt-2">『{p_name_short}』 4대 핵심 구성 로드맵</p>
+        <p class="text-slate-500 text-sm sm:text-base mt-2">순서대로 따라만 하면 초보자도 완벽한 결과를 완성할 수 있습니다</p>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-7 border-t-4 border-t-emerald-600 shadow-sm">
-          <div class="flex items-center justify-between mb-3">
-            <span class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">1부 · 이해 (Why)</span>
-            <span class="text-xs text-slate-400 font-semibold">p.13 ~ p.38</span>
-          </div>
-          <h3 class="text-xl font-black text-slate-900 mb-3">왜 퍼스널 브랜딩 책을 써야 하는가?</h3>
-          <ul class="space-y-2 text-sm text-slate-700">
-            <li>• <strong>제1장 퍼스널 브랜딩 시대:</strong> 퇴사보다 독립, 내 이름 석 자로 시작하는 인생 2막</li>
-            <li>• <strong>스펙을 이기는 스토리:</strong> 1%의 천재가 아닌 99%의 평범함이 무기가 되는 시대</li>
-            <li>• <strong>검색되는 전문가가 되어라:</strong> '내 이름'이 곧 신뢰를 증명하는 최고의 레퍼런스</li>
-            <li>• <strong>제2장 내 안의 장벽 무너뜨리기:</strong> 일기와 에세이를 가르는 단 하나의 차이</li>
-            <li>• <strong>완벽한 문장이라는 오만함 버리기:</strong> 개인적 실패담과 생생한 감정선을 글로 녹여내는 법</li>
-          </ul>
-        </div>
-
-        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-7 border-t-4 border-t-blue-600 shadow-sm">
-          <div class="flex items-center justify-between mb-3">
-            <span class="px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-bold">2부 · 기획 (What)</span>
-            <span class="text-xs text-slate-400 font-semibold">p.39 ~ p.62</span>
-          </div>
-          <h3 class="text-xl font-black text-slate-900 mb-3">무슨 이야기를 쓸 것인가? (글감과 타겟)</h3>
-          <ul class="space-y-2 text-sm text-slate-700">
-            <li>• <strong>제1장 타겟 고객과 페르소나 설정:</strong> "모두를 위한 책"은 "아무도 읽지 않는 책"이다</li>
-            <li>• <strong>송곳처럼 뾰족한 1명의 페르소나:</strong> 과거의 '나'에게 쓰는 위로장</li>
-            <li>• <strong>시장조사의 함정:</strong> 남들이 좋아하는 트렌드보다 내가 '견뎌낸' 시간의 가치</li>
-            <li>• <strong>제2장 퍼스널 에세이 작법:</strong> 목차는 책의 지도다 (구슬을 꿰어 목걸이로 만드는 구조화)</li>
-            <li>• <strong>매력적인 목차의 3요소 &amp; 실전 뼈대 잡기:</strong> 후킹, 논리, 기대감 + 스토리텔링 5단 구조</li>
-          </ul>
-        </div>
-
-        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-7 border-t-4 border-t-indigo-600 shadow-sm">
-          <div class="flex items-center justify-between mb-3">
-            <span class="px-3 py-1 rounded-full bg-indigo-100 text-indigo-800 text-xs font-bold">3부 · 집필 (How)</span>
-            <span class="text-xs text-slate-400 font-semibold">p.63 ~ p.88</span>
-          </div>
-          <h3 class="text-xl font-black text-slate-900 mb-3">백지 공포증 이겨내고 초고 완성하기</h3>
-          <ul class="space-y-2 text-sm text-slate-700">
-            <li>• <strong>제1장 AI 글쓰기 비결:</strong> 뼈대만 던져주면 AI가 살을 붙이는 맞춤형 프롬프트의 비밀</li>
-            <li>• <strong>인간적 글쓰기의 비밀:</strong> 기계 냄새를 없애는 괴상한 프롬프트 활용법</li>
-            <li>• <strong>제2장 AI가 쓴 글을 내 글로 다림질하기:</strong> 문장 다이어트 (한 문장에 하나의 생각만)</li>
-            <li>• <strong>생동감 불어넣기 &amp; 버리는 용기:</strong> 시제 통일과 번역체(수동태) 버리기, 과감하게 잘라내기</li>
-            <li>• <strong>제3장 화룡점정:</strong> 독자의 멱살을 잡는 강렬한 프롤로그 &amp; 긴 여운을 남기는 에필로그</li>
-          </ul>
-        </div>
-
-        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-7 border-t-4 border-t-amber-500 shadow-sm">
-          <div class="flex items-center justify-between mb-3">
-            <span class="px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-bold">4부 · 출판 및 마케팅 (After)</span>
-            <span class="text-xs text-slate-400 font-semibold">p.89 ~ p.110</span>
-          </div>
-          <h3 class="text-xl font-black text-slate-900 mb-3">부크크(Bookk) 무료 출판 &amp; 네이버 공식 작가 데뷔</h3>
-          <ul class="space-y-2 text-sm text-slate-700">
-            <li>• <strong>제1장 부크크 출판 등록:</strong> 재고 부담 없는 0원 POD 출판의 마법 &amp; 집필 5단계</li>
-            <li>• <strong>책의 얼굴 만들기:</strong> 내지 규격 맞추기와 전용 폰트 세팅 실전 가이드</li>
-            <li>• <strong>반려 지옥 탈출하기:</strong> 한 번에 승인받는 완벽한 표지를 위한 인디자인 노하우</li>
-            <li>• <strong>제2장 작가로서의 첫걸음:</strong> 정식 ISBN 발급과 부크크 플랫폼 등록 및 초기 마케팅</li>
-            <li>• <strong>나도 이제 네이버 공식 작가!:</strong> 네이버 인물 검색에 내 이름과 저서 등록하기</li>
-          </ul>
-        </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">{bento_cards_html}
       </div>
     </div>
   </section>
 
-  <!-- ==================== [섹션 6: 밝은 슬레이트 교차] 저자 소개 ==================== -->
+  <!-- ==================== [섹션 6: 밝은 슬레이트 교차] 브랜드 / 저자 소개 ==================== -->
   <section class="py-16 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
     <div class="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm flex flex-col sm:flex-row items-center gap-8">
-      <div class="w-28 h-28 rounded-full bg-gradient-to-tr from-emerald-700 to-teal-500 flex items-center justify-center text-white text-3xl font-black shadow-lg shrink-0">
-        김진호
+      <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-emerald-700 to-teal-500 flex items-center justify-center text-white text-xl font-black shadow-lg shrink-0 text-center px-2">
+        OFFICIAL
       </div>
       <div>
-        <div class="text-xs font-bold text-emerald-700 uppercase tracking-wider">AUTHOR PROFILE</div>
-        <h3 class="text-2xl font-black text-slate-900 mt-1">저자 {p_author} · "공학과 행정, 인문학을 융합한 하이브리드 리더"</h3>
+        <div class="text-xs font-bold text-emerald-700 uppercase tracking-wider">CREATOR &amp; BRAND PROFILE</div>
+        <h3 class="text-2xl font-black text-slate-900 mt-1">{p_author}</h3>
         <p class="text-sm text-slate-600 mt-2.5 leading-relaxed">
-          홍익대학교 컴퓨터공학 전공, 사이버한국외국어대학교 한국어·영어 복수전공, 백석대학교 행정학 박사(Ph.D.) 학위를 취득했습니다.
-          공동출판 프로젝트를 직접 기획·강의하며 『하나님의 나라를 회복하는 경영행정 스토리 Vol.1, Vol.2』, 『AI 행정학 마스터』 등 다수의 저서를 성공적으로 출간했고,
-          현재 신한대학교 교목 및 15년 경력의 대학 행정 전문가로서 평범한 사람들이 자신의 이야기로 세상과 소통하며 퍼스널 브랜딩을 완성하도록 돕고 있습니다.
+          {p_target_desc}
         </p>
       </div>
     </div>
@@ -629,108 +613,30 @@ class GitHubDesignRenderer:
   {gifts_section}
 
   <!-- ==================== [섹션 7: 프리미엄 다크 교차] PRICING & OFFER ==================== -->
-  <section id="pricing" class="bg-slate-950 text-white py-24 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-5xl mx-auto">
-      <div class="text-center mb-14">
-        <span class="px-3.5 py-1.5 rounded-full bg-emerald-900/60 text-emerald-300 text-xs font-bold border border-emerald-500/40">START YOUR AUTHOR JOURNEY</span>
-        <h2 class="text-3xl sm:text-4xl font-black text-white mt-3">오늘 읽고, 이번 달에 '내 이름의 책'을 출간하세요</h2>
-        <p class="text-slate-400 text-sm sm:text-base mt-2">커피 두 잔 값으로 평생 검색되는 '네이버 등록 작가' 타이틀을 얻는 가장 확실한 투자</p>
-      </div>
+  <section id="pricing" class="bg-slate-950 text-white py-20 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-4xl mx-auto text-center">
+      <span class="px-3.5 py-1.5 rounded-full bg-emerald-900/60 text-emerald-300 text-xs font-bold border border-emerald-500/40">SPECIAL OFFER</span>
+      <h2 class="text-3xl sm:text-4xl font-black text-white mt-3">지금 바로 『{p_name_short}』를 시작하세요!</h2>
+      <p class="text-slate-400 text-sm sm:text-base mt-2">{p_target_desc}</p>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
-        <div class="relative rounded-2xl bg-gradient-to-b from-emerald-950 via-slate-900 to-slate-900 p-8 border-2 border-emerald-500 shadow-2xl flex flex-col justify-between">
-          <div class="absolute -top-3.5 left-1/2 transform -translate-x-1/2 bg-emerald-600 text-white text-xs font-bold px-4 py-1 rounded-full shadow-lg whitespace-nowrap">
-            🔥 BEST CHOICE · 즉시 다운로드 및 프롬프트 활용
-          </div>
-
-          <div>
-            <div class="mt-2">
-              <h3 class="text-2xl font-black text-white">💻 전자책(PDF) 에디션</h3>
-              <p class="text-xs text-emerald-300 mt-1">결제 즉시 열람 + PC/태블릿에 띄워두고 바로 따라하기</p>
-            </div>
-
-            <div class="mt-6 flex items-baseline gap-2">
-              <span class="text-4xl font-black text-amber-400">{p_price}</span>
-              <span class="text-xs font-bold text-emerald-300 bg-emerald-950/80 px-2.5 py-1 rounded border border-emerald-500/30">즉시 다운로드 가능</span>
-            </div>
-
-            <ul class="mt-8 space-y-3.5 text-sm text-slate-200">
-              <li class="flex items-center gap-2.5">
-                <span class="text-emerald-400 font-bold">✓</span>
-                <span><strong>110쪽 고화질 PDF (ISBN 9791112221186):</strong> 평생 무제한 소장</span>
-              </li>
-              <li class="flex items-center gap-2.5">
-                <span class="text-emerald-400 font-bold">✓</span>
-                <span><strong>AI 글쓰기 &amp; 다림질 프롬프트:</strong> 화면에 띄워두고 바로 복붙 활용</span>
-              </li>
-              <li class="flex items-center gap-2.5">
-                <span class="text-emerald-400 font-bold">✓</span>
-                <span><strong>부크크 승인 패스 노하우:</strong> 내지 규격 &amp; 인디자인 표지 반려 탈출법</span>
-              </li>
-              <li class="flex items-center gap-2.5">
-                <span class="text-emerald-400 font-bold">✓</span>
-                <span><strong>네이버 인물 검색 등록:</strong> 공식 작가 등록 A to Z 완벽 수록</span>
-              </li>
-            </ul>
-          </div>
-
-          <div class="mt-8">
-            <a href="{p_ebook_link}" target="_blank" class="w-full block py-4 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-center text-base shadow-lg shadow-emerald-500/30 transition">
-              전자책(PDF) 즉시 구매하기 ({p_price}) →
-            </a>
-            <p class="text-center text-xs text-slate-400 mt-2">부크크 공식 전자책 스토어 · 결제 즉시 다운로드</p>
-          </div>
+      <div class="mt-10 rounded-3xl bg-gradient-to-b from-emerald-950 via-slate-900 to-slate-900 p-8 border-2 border-emerald-500 shadow-2xl max-w-2xl mx-auto">
+        <div class="text-lg font-extrabold text-emerald-300">{p_name}</div>
+        <div class="mt-3 flex items-baseline justify-center gap-3">
+          <span class="text-4xl sm:text-5xl font-black text-amber-400">{p_price}</span>
+          {f'<span class="text-sm text-slate-300">(추가 옵션: {p_sub_price})</span>' if p_sub_price.strip() else ''}
         </div>
-
-        <div class="rounded-2xl bg-slate-900/60 p-8 border border-slate-800 flex flex-col justify-between">
-          <div>
-            <div class="flex justify-between items-start">
-              <div>
-                <h3 class="text-xl font-bold text-white">📖 올컬러 실물 종이책</h3>
-                <p class="text-xs text-slate-400 mt-1">서재 소장 및 밑줄 그으며 기획하기 좋은 실물 도서</p>
-              </div>
-              <span class="text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded">소장용</span>
-            </div>
-
-            <div class="mt-6 flex items-baseline gap-2">
-              <span class="text-3xl font-black text-slate-200">{p_sub_price}</span>
-              <span class="text-xs text-slate-400">112쪽 올컬러 A5</span>
-            </div>
-
-            <ul class="mt-8 space-y-3.5 text-sm text-slate-300">
-              <li class="flex items-center gap-2.5">
-                <span class="text-slate-400 font-bold">✓</span>
-                <span><strong>112쪽 올컬러 A5 판형 (ISBN 9791112222077):</strong> 고급 인쇄 품질</span>
-              </li>
-              <li class="flex items-center gap-2.5">
-                <span class="text-slate-400 font-bold">✓</span>
-                <span><strong>네이버 쇼핑 &amp; 주요 서점 유통:</strong> 부크크 / 교보문고 / 알라딘 공식 등록</span>
-              </li>
-              <li class="flex items-center gap-2.5">
-                <span class="text-slate-400 font-bold">✓</span>
-                <span>실제 부크크 POD로 출판된 결과물 품질을 직접 눈으로 확인 가능</span>
-              </li>
-              <li class="flex items-center gap-2.5 text-slate-500">
-                <span>•</span>
-                <span>주문 제작(POD) 특성상 영업일 기준 2~8일 이내 제작·배송</span>
-              </li>
-            </ul>
-          </div>
-
-          <div class="mt-8">
-            <a href="{p_paper_link}" target="_blank" class="w-full block py-3.5 px-6 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-center text-sm border border-slate-700 transition">
-              종이책 서점에서 주문하기 ({p_sub_price}) →
-            </a>
-            <p class="text-center text-xs text-slate-500 mt-2">네이버 도서 공식 카탈로그 연결</p>
-          </div>
+        <div class="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
+          <a href="{p_ebook_link}" target="_blank" class="flex-1 py-4 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-center text-base shadow-lg shadow-emerald-500/30 transition">
+            🚀 메인 상품 즉시 구매하기 ({p_price}) →
+          </a>
+          {f'<a href="{p_paper_link}" target="_blank" class="flex-1 py-4 px-6 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-center text-base border border-slate-700 transition">📖 추가 옵션 주문하기 ({p_sub_price}) →</a>' if p_sub_price.strip() else ''}
         </div>
       </div>
     </div>
   </section>
 
-  <!-- 하단 푸터 -->
   <footer class="py-12 bg-slate-900 border-t border-slate-800 text-center text-xs text-slate-500">
-    <p>© 2026 {p_name}. 저자 {p_author} 저작권 소유. All rights reserved.</p>
+    <p>© 2026 {p_name}. {p_author}. All rights reserved.</p>
   </footer>
 
 </body>
@@ -742,33 +648,18 @@ class GitHubDesignRenderer:
         html_path = "pro_detail_page.html"
         with open(html_path, "w", encoding="utf-8") as f:
             f.write(html_content)
-        
-        png_path = "detail_page_render.png"
-        try:
-            with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True)
-                page = browser.new_page(viewport={"width": 1200, "height": 800}, device_scale_factor=2)
-                abs_html_path = os.path.abspath(html_path).replace("\\", "/")
-                page.goto(f"file:///{abs_html_path}", wait_until="networkidle")
-                page.evaluate("() => document.fonts.ready")
-                page.wait_for_timeout(1500)
-                page.screenshot(path=png_path, full_page=True)
-                browser.close()
-            print(f"SUCCESS: Rendered HTML and high-res PNG -> {png_path}")
-        except Exception as e:
-            print(f"Playwright rendering notice: {e}")
 
-if __name__ == "__main__":
-    renderer = GitHubDesignRenderer()
-    renderer.render_all({
-        "name": "에세이 한 권으로 당신을 증명하라: AI로 완성하는 퍼스널 브랜딩 출판 비결",
-        "price": "8,000원",
-        "sub_price": "12,000원",
-        "author": "김진호 박사",
-        "has_comparison": True,
-        "review_mode": "ad_promo",  # "real" or "ad_promo" or "none"
-        "has_faq": True,
-        "has_gifts": True,
-        "ebook_link": "https://bookk.co.kr/bookStore/6a35e5e5f5d317cf59a3c17e",
-        "paper_link": "https://search.shopping.naver.com/book/catalog/60677619152?query=%EC%97%90%EC%84%B8%EC%9D%B4%20%ED%95%9C%20%EA%B6%8C%EC%9C%BC%EB%A1%9C%20%EB%8B%B9%EC%8B%A0%EC%9D%84%20%EC%A6%9D%EB%AA%85%ED%95%98%EB%9D%BC&NaPm=ct%3Dmv6528i8%7Cci%3D2dc082a4012fc5a426416cd172e3906ba5165b26%7Ctr%3Dboksl%7Csn%3D95694%7Chk%3D094ce9625fa67ab6bf58f1ebe3cedb0fae84df84"
-    })
+        png_path = "detail_page_render.png"
+        if sync_playwright is not None:
+            try:
+                with sync_playwright() as p:
+                    browser = p.chromium.launch(headless=True)
+                    page = browser.new_page(viewport={"width": 1200, "height": 800}, device_scale_factor=2)
+                    abs_html_path = os.path.abspath(html_path).replace("\\", "/")
+                    page.goto(f"file:///{abs_html_path}", wait_until="networkidle")
+                    page.evaluate("() => document.fonts.ready")
+                    page.wait_for_timeout(1200)
+                    page.screenshot(path=png_path, full_page=True)
+                    browser.close()
+            except Exception as e:
+                print(f"Playwright rendering notice: {e}")

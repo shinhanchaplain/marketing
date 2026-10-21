@@ -312,17 +312,19 @@ class ProductURLAnalyzer:
                             if 4 <= len(cand_t) <= 45:
                                 data["title"] = cand_t
 
-                    # 실제 후기성 문장 감지
-                    if any(rk in l for rk in ["맛있", "쫄깃", "좋아요", "만족", "쟁여", "해먹", "구입", "구매", "후기", "최고", "추천", "편해", "충분"]):
-                        if 20 <= len(l) <= 180 and not any(skip in l for skip in ["검색 결과", "무료배송", "시작하기", "혜택받기", "비밀번호"]):
+                    # 실제 후기성 문장 감지 (일반 플랫폼 설명문이나 브랜드 소개문은 제외하고 실제 시식/사용 후기만 추출)
+                    if any(rk in l for rk in ["맛있", "쫄깃", "좋아요", "만족", "쟁여", "해먹", "구입", "구매", "후기", "최고", "추천", "편해", "충분", "식감"]):
+                        if 20 <= len(l) <= 185 and not any(skip in l for skip in [
+                            "검색 결과", "무료배송", "시작하기", "혜택받기", "비밀번호", "쇼핑라이브는", "원칙으로 합니다", "플랫폼입니다", "성분 분석"
+                        ]):
                             clean_rev = re.sub(r",?\s*작성자\s*:.*$", "", l).strip(" ,·-")
                             if len(clean_rev) >= 18:
                                 raw_reviews.append({"text": clean_rev, "author": "네이버페이 구매자"})
 
                     # 상품 특장점/원료/제조 노하우 문장 감지
-                    if any(fk in l for fk in ["개발", "시스템", "원료", "생산", "품질", "특징", "노하우", "구성", "퍼지지", "신선", "위생"]):
-                        if 22 <= len(l) <= 160 and not any(skip in l for skip in ["검색 결과", "로그인", "쿠키"]):
-                            data["feature_lines"].append(l)
+                    if any(fk in l for fk in ["개발", "시스템", "원료", "생산", "품질", "특징", "노하우", "구성", "퍼지지", "신선", "위생", "분말", "오리지널"]):
+                        if 20 <= len(l) <= 165 and not any(skip in l for skip in ["검색 결과", "로그인", "쿠키", "쇼핑라이브는", "성분 분석"]):
+                            data["feature_lines"].append(l.strip(" ,·-"))
             except Exception:
                 pass
 
@@ -489,9 +491,11 @@ class ProductURLAnalyzer:
                 result["crawled_reviews"] = extra_revs
                 result["review_mode"] = "real"
 
-        all_extracted_lines = ocr_lines + raw_text_lines
-        if all_extracted_lines:
-            result["ocr_text_summary"] = "\n".join(all_extracted_lines[:15])
+        # 정제된 본문 특장점(raw_text_lines)을 우선 배치하고, 깨지지 않은 깨끗한 OCR 문장(ocr_lines)을 결합
+        clean_ocr_lines = [l for l in ocr_lines if not re.search(r"[\{\}\[\]\|]", l) and len(re.findall(r"[가-힣]", l)) >= 6]
+        all_extracted_lines = raw_text_lines + clean_ocr_lines
+        if ocr_lines:
+            result["ocr_text_summary"] = "\n".join(ocr_lines[:15])
 
         # 제목 최종 정제
         final_title = hint_title or og_title or query_hint or "프리미엄 인기 상품"

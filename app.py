@@ -220,6 +220,11 @@ if st.session_state.current_page == "1_input":
                 fd["paper_link"] = analyzed["paper_link"]
                 if analyzed.get("cover_b64"):
                     fd["cover_b64"] = analyzed["cover_b64"]
+                if analyzed.get("pain_b64"):
+                    fd["pain_b64"] = analyzed["pain_b64"]
+                if analyzed.get("sol_b64"):
+                    fd["sol_b64"] = analyzed["sol_b64"]
+                fd["saved_image_paths"] = analyzed.get("saved_image_paths", [])
                 fd["target_audience"] = analyzed["target_audience"]
                 fd["headline_1"] = analyzed["headline_1"]
                 fd["headline_2"] = analyzed["headline_2"]
@@ -388,6 +393,8 @@ if st.session_state.current_page == "1_input":
                 "ebook_link": fd["ebook_link"],
                 "paper_link": fd["paper_link"] or fd["ebook_link"],
                 "cover_b64": fd.get("cover_b64", ""),
+                "pain_b64": fd.get("pain_b64", ""),
+                "sol_b64": fd.get("sol_b64", ""),
                 "target_audience": fd["target_audience"],
                 "headline_1": fd["headline_1"],
                 "headline_2": fd["headline_2"],
@@ -480,16 +487,26 @@ elif st.session_state.current_page == "2_result":
             st.info("PNG 이미지가 아직 생성되지 않았습니다.")
 
     with res_tab3:
-        ic1, ic2, ic3 = st.columns(3)
-        with ic1:
-            if os.path.exists("product_images/book_cover.jpg"):
-                st.image("product_images/book_cover.jpg", caption="📘 대표 상품 이미지 (3D 목업용)", use_container_width=True)
-        with ic2:
-            if os.path.exists("product_images/scene_pain_point.jpg"):
-                st.image("product_images/scene_pain_point.jpg", caption="🚨 AI 고통 상황 컷 (16:9 가로형)", use_container_width=True)
-        with ic3:
-            if os.path.exists("product_images/scene_solution.jpg"):
-                st.image("product_images/scene_solution.jpg", caption="💡 AI 문제 해결 컷 (16:9 가로형)", use_container_width=True)
+        saved_imgs = [p for p in fd.get("saved_image_paths", []) if os.path.exists(p)]
+        if saved_imgs:
+            st.success(f"판매 페이지에서 총 {len(saved_imgs)}장의 상품 이미지를 자동 추출하여 `extracted_assets/` 폴더에 저장했습니다.")
+            cols = st.columns(min(len(saved_imgs), 3))
+            for idx, img_p in enumerate(saved_imgs):
+                with cols[idx % len(cols)]:
+                    st.image(img_p, caption=f"추출된 상품 이미지 #{idx+1}", use_container_width=True)
+                    with open(img_p, "rb") as f_img:
+                        st.download_button(f"💾 이미지 #{idx+1} 다운로드", f_img.read(), os.path.basename(img_p), "image/jpeg", key=f"dl_ext_{idx}", use_container_width=True)
+        else:
+            ic1, ic2, ic3 = st.columns(3)
+            with ic1:
+                if os.path.exists("product_images/book_cover.jpg"):
+                    st.image("product_images/book_cover.jpg", caption="📘 대표 상품 이미지 (3D 목업용)", use_container_width=True)
+            with ic2:
+                if os.path.exists("product_images/scene_pain_point.jpg"):
+                    st.image("product_images/scene_pain_point.jpg", caption="🚨 AI 고통 상황 컷 (16:9 가로형)", use_container_width=True)
+            with ic3:
+                if os.path.exists("product_images/scene_solution.jpg"):
+                    st.image("product_images/scene_solution.jpg", caption="💡 AI 문제 해결 컷 (16:9 가로형)", use_container_width=True)
 
 # ==============================================================================
 # [페이지 3] 📋 100점 품질 진단 & 설득 카피 리포트 (보조 분석 페이지)

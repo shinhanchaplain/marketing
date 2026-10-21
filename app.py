@@ -28,8 +28,10 @@ st.markdown("""
 if "current_page" not in st.session_state:
     st.session_state.current_page = "1_input"
 
+
 def get_essay_book_preset():
     return {
+        "is_book": True,
         "source_url": "https://search.shopping.naver.com/book/catalog/60677619152?query=%EC%97%90%EC%84%B8%EC%9D%B4%20%ED%95%9C%20%EA%B6%8C%EC%9C%BC%EB%A1%9C%20%EB%8B%B9%EC%8B%A0%EC%9D%84%20%EC%A6%9D%EB%AA%85%ED%95%98%EB%9D%BC",
         "prod_title": "에세이 한 권으로 당신을 증명하라 (AI로 완성하는 퍼스널 브랜딩 출판 비결)",
         "prod_author": "김진호 지음 (퍼스널 브랜딩 & AI 출판 전문가)",
@@ -38,6 +40,10 @@ def get_essay_book_preset():
         "ebook_link": "https://bookk.co.kr/bookStore/6a35e5e5f5d317cf59a3c17e",
         "paper_link": "https://search.shopping.naver.com/book/catalog/60677619152?query=%EC%97%90%EC%84%B8%EC%9D%B4%20%ED%95%9C%20%EA%B6%8C%EC%9C%BC%EB%A1%9C%20%EB%8B%B9%EC%8B%A0%EC%9D%84%20%EC%A6%9D%EB%AA%85%ED%95%98%EB%9D%BC&NaPm=ct%3Dmv6528i8%7Cci%3D2dc082a4012fc5a426416cd172e3906ba5165b26%7Ctr%3Dboksl%7Csn%3D95694%7Chk%3D094ce9625fa67ab6bf58f1ebe3cedb0fae84df84",
         "cover_b64": "",
+        "pain_b64": "",
+        "sol_b64": "",
+        "all_b64_images": [],
+        "saved_image_paths": [],
         "target_audience": "자신의 전문 영역에서 어려움을 이겨낸 경험을 책으로 펴내어 퍼스널 브랜딩을 완성하고, 부크크 0원 출판 및 네이버 공식 작가 인물등록까지 달성하고 싶은 직장인·전문가·1인 기업가",
         "headline_1": "이력서 100장보다 강력한 내 이름의 책 한 권,",
         "headline_2": "『에세이 한 권으로 당신을 증명하라』로 완벽하게 증명하세요.",
@@ -94,13 +100,63 @@ def get_essay_book_preset():
         ]
     }
 
+
+def build_render_payload(fd: dict) -> dict:
+    return {
+        "is_book": fd.get("is_book", False),
+        "name": fd["prod_title"],
+        "price": fd["price_main"],
+        "sub_price": fd["price_sub"],
+        "author": fd["prod_author"],
+        "ebook_link": fd["ebook_link"],
+        "paper_link": fd["paper_link"] or fd["ebook_link"],
+        "cover_b64": fd.get("cover_b64", ""),
+        "pain_b64": fd.get("pain_b64", ""),
+        "sol_b64": fd.get("sol_b64", ""),
+        "all_b64_images": fd.get("all_b64_images", []),
+        "target_audience": fd["target_audience"],
+        "headline_1": fd["headline_1"],
+        "headline_2": fd["headline_2"],
+        "pain_title": fd["pain_title"],
+        "pain_desc": fd.get("pain_desc", ""),
+        "sol_title": fd["sol_title"],
+        "sol_desc": fd.get("sol_desc", ""),
+        "bento_items": fd.get("bento_items", []),
+        "metrics": fd.get("metrics", []),
+        "comp_rows": fd.get("comp_rows", []),
+        "faq_items": fd.get("faq_items", []),
+        "videos": fd.get("videos", []),
+        "review_mode": fd["review_mode"],
+        "custom_reviews": fd["custom_reviews"],
+        "has_comparison": fd["has_comparison"],
+        "has_gifts": fd["has_gifts"],
+        "has_faq": fd["has_faq"]
+    }
+
+
+def execute_rendering(fd: dict):
+    payload = build_render_payload(fd)
+    GitHubDesignRenderer().render_all(payload)
+    pro_svg = ProDetailRenderer().render_pro_canvas_svg(payload)
+    with open("figma_canvas_design.svg", "w", encoding="utf-8") as f:
+        f.write(pro_svg)
+
+
 if "form_data" not in st.session_state:
     st.session_state.form_data = get_essay_book_preset()
 
 if "analysis_notice" not in st.session_state:
     st.session_state.analysis_notice = ""
 
+
+def clear_review_widget_keys():
+    for k in list(st.session_state.keys()):
+        if k.startswith("rv_b_") or k.startswith("rv_t_") or k.startswith("rv_a_"):
+            del st.session_state[k]
+
+
 def apply_preset(preset_key: str):
+    clear_review_widget_keys()
     fd = get_essay_book_preset()
     if preset_key == "NORMAL_01":
         fd["review_mode"] = "real"
@@ -115,6 +171,9 @@ def apply_preset(preset_key: str):
         fd["prod_title"] = ""
         fd["ebook_link"] = "bookk.co.kr/wrong_link_without_https"
     st.session_state.form_data = fd
+    if preset_key != "EXC_03_INVALID":
+        execute_rendering(fd)
+
 
 # ----------------- 사이드바 & 상단 페이지 전환 네비게이션 -----------------
 with st.sidebar:
@@ -140,10 +199,10 @@ with st.sidebar:
     st.markdown("##### 💡 탑재된 핵심 자동화 기능")
     st.caption(
         "• **판매 링크(URL) 1개 자동 분석**\n"
+        "• **상품 이미지 자르지 않고 원본 비율 그대로 보존**\n"
         "• **통이미지 상세페이지 ➔ 텍스트 OCR 전환**\n"
         "• **원본 동영상(YouTube/MP4) 그대로 보존**\n"
-        "• **리뷰 크롤링 & 광고 소구점 베스트 3 선별**\n"
-        "• **후기 없으면 광고 배너로 안전 전환**"
+        "• **리뷰 크롤링 & 광고 소구점 베스트 3 선별**"
     )
 
 # 상단 공통 헤더 및 빠른 페이지 전환 버튼
@@ -171,15 +230,14 @@ fd = st.session_state.form_data
 if st.session_state.current_page == "1_input":
     st.markdown("### 📝 [페이지 1] 판매 페이지 링크(URL) 자동 분석 & 상품 정보 입력")
 
-    # ----------------- [핵심 기능] 판매 페이지 URL 하나로 전체 자동 분석 & 재구성 -----------------
     st.markdown("""
     <div class="url-magic-card">
-        <span class="step-badge">⚡ 1초 자동 분석 엔진 (URL + 이미지 OCR + 동영상 보존 + 베스트 리뷰 발췌)</span>
+        <span class="step-badge">⚡ 1초 자동 분석 엔진 (원본 비율 무손실 이미지 + 이미지 OCR + 동영상 보존 + 베스트 리뷰 발췌)</span>
         <h4 style="margin:0 0 6px 0; color:#064e3b; font-size:18px;">🔍 판매 페이지 링크(URL) 하나만 넣으면 상세페이지를 새로 재구성합니다!</h4>
         <p style="font-size:13px; color:#334155; margin:0;">
-            • 기존 상세페이지가 <strong>통이미지</strong>로 되어 있어도 <strong>이미지 속 글자(OCR)를 텍스트로 전환</strong>해 깔끔하게 정리합니다.<br>
-            • 페이지 안에 <strong>동영상(YouTube, 네이버TV, MP4)</strong>이 있으면 삭제하지 않고 <strong>새 상세페이지에 그대로 살려서 넣어줍니다.</strong><br>
-            • 페이지의 <strong>구매자 리뷰를 크롤링</strong>하여 <strong>광고할 만한 소구점이 있는 베스트 리뷰 3건</strong>을 자동 발췌합니다.
+            • <strong>상품 이미지는 절대 자르지 않고(무손실 원본 비율 그대로)</strong> 고화질로 추출하여 상세페이지에 반영합니다.<br>
+            • 새로운 링크를 분석하면 <strong>이전 샘플(도서 등) 데이터는 100% 초기화</strong>되어 내용이 절대 섞이지 않습니다.<br>
+            • 페이지 안에 <strong>동영상(YouTube, 네이버TV, MP4)</strong>이 있으면 그대로 살리고, <strong>구매자 베스트 리뷰 3건</strong>을 자동 발췌합니다.
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -187,15 +245,14 @@ if st.session_state.current_page == "1_input":
     url_col1, url_col2 = st.columns([3, 1])
     with url_col1:
         input_sales_url = st.text_input(
-            "🔗 분석할 상품 판매 페이지 링크(URL)를 붙여넣으세요 (스마트스토어, 부크크, 네이버쇼핑, 예스24, 쿠팡, 자체몰 등)",
+            "🔗 분석할 상품 판매 페이지 링크(URL) 또는 [상품명](URL)을 붙여넣으세요",
             value=fd.get("source_url", ""),
-            placeholder="https://..."
+            placeholder="https://smartstore.naver.com/..."
         )
     with url_col2:
         st.markdown("<div style='height:28px;'></div>", unsafe_allow_html=True)
         btn_analyze_url = st.button("🔍 링크 분석해서 내용 자동 채우기", type="primary", use_container_width=True)
 
-    # 통이미지 상세페이지 파일 직접 업로드 OCR & 추가 리뷰 텍스트 붙여넣기 (보조 옵션)
     with st.expander("🖼️ (선택) 기존 상세페이지가 통이미지 파일이거나, 캡처한 이미지에서 글자(OCR)·리뷰를 추출하고 싶다면 여기를 클릭하세요", expanded=False):
         up_c1, up_c2 = st.columns(2)
         with up_c1:
@@ -204,53 +261,80 @@ if st.session_state.current_page == "1_input":
             pasted_raw_reviews = st.text_area("또는 기존 판매 페이지의 리뷰들을 복사해 붙여넣으시면 광고 포인트 베스트 3건을 자동 선별합니다", height=90, placeholder="리뷰 여러 줄을 그대로 붙여넣으세요...")
 
     if btn_analyze_url:
-        with st.spinner("판매 페이지 URL 분석, 통이미지 한국어 OCR 텍스트 변환, 원본 동영상 추출, 베스트 리뷰 선별을 진행 중입니다..."):
+        with st.spinner("이전 데이터를 완전히 초기화하고, 새 상품의 원본 비율 이미지·특장점·동영상·베스트 리뷰를 추출해 상세페이지를 재구성 중입니다..."):
             analyzer = ProductURLAnalyzer()
             extra_ocr = ""
             if uploaded_detail_img is not None:
                 extra_ocr = analyzer.extract_text_from_image_bytes(uploaded_detail_img.read(), uploaded_detail_img.name)
-            analyzed = analyzer.analyze_url(input_sales_url, extra_ocr_text=extra_ocr, extra_review_text=pasted_raw_reviews if 'pasted_raw_reviews' in locals() else "")
+            analyzed = analyzer.analyze_url(
+                input_sales_url,
+                extra_ocr_text=extra_ocr,
+                extra_review_text=pasted_raw_reviews if 'pasted_raw_reviews' in locals() else ""
+            )
             if analyzed.get("success"):
-                fd["source_url"] = input_sales_url
-                fd["prod_title"] = analyzed["prod_title"]
-                fd["prod_author"] = analyzed["prod_author"]
-                fd["price_main"] = analyzed["price_main"]
-                fd["price_sub"] = analyzed["price_sub"]
-                fd["ebook_link"] = analyzed["ebook_link"]
-                fd["paper_link"] = analyzed["paper_link"]
-                if analyzed.get("cover_b64"):
-                    fd["cover_b64"] = analyzed["cover_b64"]
-                if analyzed.get("pain_b64"):
-                    fd["pain_b64"] = analyzed["pain_b64"]
-                if analyzed.get("sol_b64"):
-                    fd["sol_b64"] = analyzed["sol_b64"]
-                fd["saved_image_paths"] = analyzed.get("saved_image_paths", [])
-                fd["target_audience"] = analyzed["target_audience"]
-                fd["headline_1"] = analyzed["headline_1"]
-                fd["headline_2"] = analyzed["headline_2"]
-                fd["pain_title"] = analyzed["pain_title"]
-                fd["pain_desc"] = analyzed["pain_desc"]
-                fd["sol_title"] = analyzed["sol_title"]
-                fd["sol_desc"] = analyzed["sol_desc"]
-                fd["bento_items"] = analyzed["bento_items"]
-                fd["metrics"] = analyzed["metrics"]
-                fd["comp_rows"] = analyzed["comp_rows"]
-                fd["faq_items"] = analyzed["faq_items"]
-                fd["videos"] = analyzed["videos"]
-                fd["ocr_text_summary"] = analyzed.get("ocr_text_summary", "")
-                if analyzed.get("crawled_reviews"):
-                    fd["custom_reviews"] = analyzed["crawled_reviews"]
-                    fd["review_mode"] = "real"
-                else:
-                    fd["review_mode"] = "ad_promo"
+                clear_review_widget_keys()
+                crawled_revs = analyzed.get("crawled_reviews") or []
+                # 이전 도서 프리셋 데이터가 단 1글자도 남지 않도록 완전히 새로운 딕셔너리로 교체!
+                new_fd = {
+                    "is_book": analyzed.get("is_book", False),
+                    "source_url": input_sales_url,
+                    "prod_title": analyzed["prod_title"],
+                    "prod_author": analyzed["prod_author"],
+                    "price_main": analyzed["price_main"],
+                    "price_sub": analyzed.get("price_sub", ""),
+                    "ebook_link": analyzed["ebook_link"],
+                    "paper_link": analyzed["paper_link"],
+                    "cover_b64": analyzed.get("cover_b64", ""),
+                    "pain_b64": analyzed.get("pain_b64", ""),
+                    "sol_b64": analyzed.get("sol_b64", ""),
+                    "all_b64_images": analyzed.get("all_b64_images", []),
+                    "saved_image_paths": analyzed.get("saved_image_paths", []),
+                    "target_audience": analyzed["target_audience"],
+                    "headline_1": analyzed["headline_1"],
+                    "headline_2": analyzed["headline_2"],
+                    "pain_title": analyzed["pain_title"],
+                    "pain_desc": analyzed["pain_desc"],
+                    "sol_title": analyzed["sol_title"],
+                    "sol_desc": analyzed["sol_desc"],
+                    "bento_items": analyzed["bento_items"],
+                    "metrics": analyzed["metrics"],
+                    "comp_rows": analyzed["comp_rows"],
+                    "faq_items": analyzed["faq_items"],
+                    "videos": analyzed["videos"],
+                    "ocr_text_summary": analyzed.get("ocr_text_summary", ""),
+                    "review_mode": "real" if crawled_revs else "ad_promo",
+                    "custom_reviews": crawled_revs if crawled_revs else [
+                        {
+                            "badge": "✨ 압도적 가성비 & 만족도",
+                            "text": f"기대했던 것보다 품질과 구성이 훨씬 알차서 『{analyzed['prod_title']}』 구매하기 정말 잘했다는 생각이 듭니다!",
+                            "author": "이*진 구매자"
+                        },
+                        {
+                            "badge": "🚀 간편함 & 문제 해결",
+                            "text": "복잡한 준비 과정 없이 누구나 간편하게 즐길 수 있어서 바쁜 일상 속에서도 정말 편리하고 만족스럽습니다.",
+                            "author": "박*현 구매자"
+                        },
+                        {
+                            "badge": "👑 검증된 품질 & 재구매",
+                            "text": f"{analyzed['price_main']}이라는 합리적인 가격에 이런 퀄리티라니 다 쓰고 나면 무조건 재구매할 예정입니다!",
+                            "author": "정*호 구매자"
+                        }
+                    ],
+                    "has_comparison": True,
+                    "has_gifts": analyzed.get("has_gifts", False),
+                    "has_faq": True,
+                }
+                st.session_state.form_data = new_fd
+                # 분석 즉시 결과 파일(HTML/PNG/SVG)도 새 상품 기준으로 즉시 재렌더링하여 이전 도서 파일이 절대 남지 않게 함
+                execute_rendering(new_fd)
 
-                v_cnt = len(fd.get("videos", []))
-                r_cnt = len(analyzed.get("crawled_reviews", []))
-                ocr_cnt = len(fd.get("ocr_text_summary", "").splitlines())
+                img_cnt = len(new_fd.get("all_b64_images", []))
+                v_cnt = len(new_fd.get("videos", []))
+                r_cnt = len(crawled_revs)
                 st.session_state.analysis_notice = (
-                    f"🎉 **링크 자동 분석 완료!** 상품명(`{fd['prod_title']}`), 가격(`{fd['price_main']}`), "
-                    f"이미지/본문 핵심 문장({ocr_cnt}줄), 원본 동영상({v_cnt}개 보존), "
-                    f"광고 포인트 베스트 리뷰({r_cnt}건 발췌 ➔ {'실제 후기 모드 자동 적용' if r_cnt > 0 else '후기 없음 감지: 에디터 추천 배너로 안전 전환'})가 모두 세팅되었습니다!"
+                    f"🎉 **링크 분석 및 상세페이지 재구성 완료!** 이전 도서 데이터를 완전히 지우고 "
+                    f"**`{new_fd['prod_title']}`** (`{new_fd['price_main']}`), **원본 비율 무손실 상품 이미지({img_cnt}장)**, "
+                    f"원본 동영상({v_cnt}개), 베스트 리뷰({r_cnt}건)로 100% 교체되었습니다!"
                 )
                 st.rerun()
 
@@ -262,7 +346,9 @@ if st.session_state.current_page == "1_input":
         sc0, sc1, sc2, sc3, sc4 = st.columns(5)
         with sc0:
             if st.button("📘 에세이 출판 도서(기본)", use_container_width=True):
+                clear_review_widget_keys()
                 st.session_state.form_data = get_essay_book_preset()
+                execute_rendering(st.session_state.form_data)
                 st.session_state.analysis_notice = "📘 『에세이 한 권으로 당신을 증명하라』 기본 샘플이 로드되었습니다."
                 st.rerun()
         with sc1:
@@ -298,9 +384,8 @@ if st.session_state.current_page == "1_input":
     with c2:
         fd["ebook_link"] = st.text_input("4-1. 🔗 메인 구매 버튼 링크 (https:// 필수)", value=fd["ebook_link"])
         fd["paper_link"] = st.text_input("4-2. 🔗 보조 옵션 구매 링크", value=fd["paper_link"])
-        fd["target_audience"] = st.text_area("5. 핵심 가치 및 타깃 고객 요약 (이미지 OCR/본문 자동 추출 반영)", value=fd["target_audience"], height=85)
+        fd["target_audience"] = st.text_area("5. 핵심 가치 및 타깃 고객 요약 (본문/OCR 자동 추출 반영)", value=fd["target_audience"], height=85)
 
-    # 동영상 보존 확인 및 직접 추가 칸
     with st.expander(f"🎬 페이지 내 원본 동영상 보존 설정 (현재 감지된 동영상: {len(fd.get('videos', []))}개 — 그대로 상세페이지에 살아납니다)", expanded=bool(fd.get("videos"))):
         st.caption("판매 페이지에 있던 동영상이 자동 등록됩니다. 추가로 넣고 싶은 유튜브(YouTube)나 MP4 영상 링크가 있다면 아래에 입력해 주세요.")
         current_vid_url = fd["videos"][0]["url"] if fd.get("videos") else ""
@@ -315,13 +400,13 @@ if st.session_state.current_page == "1_input":
             fd["videos"] = []
 
     if fd.get("ocr_text_summary"):
-        with st.expander("📄 기존 상세페이지 이미지(OCR)에서 추출되어 텍스트로 전환된 원본 내용 보기", expanded=False):
-            st.text_area("추출된 이미지 텍스트", value=fd["ocr_text_summary"], height=120)
+        with st.expander("📄 기존 상세페이지에서 추출되어 텍스트로 전환된 핵심 문장 보기", expanded=False):
+            st.text_area("추출된 텍스트", value=fd["ocr_text_summary"], height=120)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
     # [Step 2 카드] 마케팅 진실성 & 크롤링된 베스트 리뷰 확인
-    st.markdown('<div class="step-card"><span class="step-badge">STEP 2 · 리뷰 크롤링 결과 & 추가 섹션 확인</span><h4 style="margin:0 0 6px 0;">⚖️ 광고 포인트 베스트 리뷰 및 추가 섹션(비교표·사은품·FAQ) 설정</h4><p style="font-size:13px; color:#64748b; margin:0;">판매 페이지에서 실제 리뷰가 발견되면 광고 소구점 베스트 3건을 자동 반영하고, 리뷰가 없으면 거짓 후기 대신 에디터 추천 광고 배너로 전환합니다.</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="step-card"><span class="step-badge">STEP 2 · 리뷰 크롤링 결과 & 추가 섹션 확인</span><h4 style="margin:0 0 6px 0;">⚖️ 광고 포인트 베스트 리뷰 및 추가 섹션(비교표·혜택·FAQ) 설정</h4><p style="font-size:13px; color:#64748b; margin:0;">판매 페이지에서 실제 리뷰가 발견되면 광고 소구점 베스트 3건을 자동 반영하고, 리뷰가 없으면 거짓 후기 대신 에디터 추천 광고 배너로 전환합니다.</p></div>', unsafe_allow_html=True)
 
     rc1, rc2 = st.columns(2)
     with rc1:
@@ -357,14 +442,14 @@ if st.session_state.current_page == "1_input":
 
     with rc2:
         st.markdown("**🧩 포함할 추가 섹션을 체크하세요 (체크 해제 시 결과에서 자동 생략):**")
-        fd["has_comparison"] = st.checkbox("⚖️ 기존 방식 대비 '품격 있는 가치 비교표' 넣기", value=fd["has_comparison"])
-        fd["has_gifts"] = st.checkbox("🎁 구매자 무료 증정 '특별 사은품 / 부록 박스' 넣기", value=fd["has_gifts"])
+        fd["has_comparison"] = st.checkbox("⚖️ 일반 상품 대비 '품격 있는 가치 비교표' 넣기", value=fd["has_comparison"])
+        fd["has_gifts"] = st.checkbox("🎁 구매 고객 '특별 혜택 / 사은품 안내 박스' 넣기", value=fd["has_gifts"])
         fd["has_faq"] = st.checkbox("❓ 구매 전 망설임을 없애는 '자주 묻는 질문(FAQ 4선)' 넣기", value=fd["has_faq"])
 
-        with st.expander("✨ (선택 사항) 재구성된 2줄 제목 & 고통/해결 문구 & 4대 핵심 포인트 수정", expanded=False):
+        with st.expander("✨ (선택 사항) 재구성된 2줄 제목 & 고통/해결 문구 수정", expanded=False):
             fd["headline_1"] = st.text_input("상단 1줄 헤드라인", value=fd["headline_1"])
             fd["headline_2"] = st.text_input("상단 2줄 강조 헤드라인", value=fd["headline_2"])
-            fd["pain_title"] = st.text_input("고객 고통 상황(Problem) 제목", value=fd["pain_title"])
+            fd["pain_title"] = st.text_input("고객 고민 상황(Problem) 제목", value=fd["pain_title"])
             fd["sol_title"] = st.text_input("핵심 해결책(Solution) 제목", value=fd["sol_title"])
 
     st.markdown("---")
@@ -384,39 +469,8 @@ if st.session_state.current_page == "1_input":
 
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("🚀 입력 완료! 상세페이지 & 랜딩페이지 생성하고 [결과 확인 페이지]로 이동 ➔", type="primary", use_container_width=True, disabled=bool(stop_errors)):
-        with st.spinner("입력/분석된 내용(이미지 OCR 텍스트 + 원본 동영상 보존 + 베스트 리뷰)으로 상세페이지를 생성 중입니다..."):
-            render_payload = {
-                "name": fd["prod_title"],
-                "price": fd["price_main"],
-                "sub_price": fd["price_sub"],
-                "author": fd["prod_author"],
-                "ebook_link": fd["ebook_link"],
-                "paper_link": fd["paper_link"] or fd["ebook_link"],
-                "cover_b64": fd.get("cover_b64", ""),
-                "pain_b64": fd.get("pain_b64", ""),
-                "sol_b64": fd.get("sol_b64", ""),
-                "target_audience": fd["target_audience"],
-                "headline_1": fd["headline_1"],
-                "headline_2": fd["headline_2"],
-                "pain_title": fd["pain_title"],
-                "pain_desc": fd.get("pain_desc", ""),
-                "sol_title": fd["sol_title"],
-                "sol_desc": fd.get("sol_desc", ""),
-                "bento_items": fd.get("bento_items", []),
-                "metrics": fd.get("metrics", []),
-                "comp_rows": fd.get("comp_rows", []),
-                "faq_items": fd.get("faq_items", []),
-                "videos": fd.get("videos", []),
-                "review_mode": fd["review_mode"],
-                "custom_reviews": fd["custom_reviews"],
-                "has_comparison": fd["has_comparison"],
-                "has_gifts": fd["has_gifts"],
-                "has_faq": fd["has_faq"]
-            }
-            GitHubDesignRenderer().render_all(render_payload)
-            pro_svg = ProDetailRenderer().render_pro_canvas_svg(render_payload)
-            with open("figma_canvas_design.svg", "w", encoding="utf-8") as f:
-                f.write(pro_svg)
+        with st.spinner("원본 비율 무손실 상품 이미지 + 보존된 동영상 + 베스트 리뷰를 반영하여 상세페이지를 생성 중입니다..."):
+            execute_rendering(fd)
             st.session_state.current_page = "2_result"
             st.rerun()
 
@@ -424,24 +478,26 @@ if st.session_state.current_page == "1_input":
 # [페이지 2] 🎨 생성 결과 확인 & 다운로드 (오직 결과 확인과 다운로드에만 집중)
 # ==============================================================================
 elif st.session_state.current_page == "2_result":
+    # 페이지 2로 바로 넘어왔을 때도 현재 세션 데이터(fd)와 HTML 파일이 항상 일치하도록 보장
+    execute_rendering(fd)
+
     head_c1, head_c2 = st.columns([3, 1])
     with head_c1:
         st.markdown("### 🎨 [페이지 2] 생성된 상세페이지 & 랜딩페이지 결과 확인")
-        st.caption(f"현재 적용 상품: **{fd['prod_title']}** ({fd['price_main']}) | 보존된 동영상: `{len(fd.get('videos', []))}개` | 후기 모드: `{fd['review_mode']}`")
+        st.caption(f"현재 적용 상품: **{fd['prod_title']}** ({fd['price_main']}) | 원본 비율 이미지: `{len(fd.get('all_b64_images', []))}장` | 보존된 동영상: `{len(fd.get('videos', []))}개` | 후기 모드: `{fd['review_mode']}`")
     with head_c2:
         if st.button("⬅️ 입력 내용 / URL 다시 분석하러 가기", use_container_width=True):
             st.session_state.current_page = "1_input"
             st.rerun()
 
-    # 1. 보류/승인 대기함 & 3대 포맷 다운로드 박스
-    st.markdown('<div class="step-card"><span class="step-badge">STEP 1 · 최종 검수 및 파일 다운로드</span><h4 style="margin:0 0 6px 0;">🛡️ 최종 승인권자(김진호 박사) 배포 전 4대 안전 체크리스트</h4></div>', unsafe_allow_html=True)
+    st.markdown('<div class="step-card"><span class="step-badge">STEP 1 · 최종 검수 및 파일 다운로드</span><h4 style="margin:0 0 6px 0;">🛡️ 배포 전 4대 품질 & 안전 체크리스트</h4></div>', unsafe_allow_html=True)
     ap_c1, ap_c2 = st.columns(2)
     with ap_c1:
         chk_1 = st.checkbox("✅ 1. 구매 버튼 링크 및 보존된 동영상이 정상 연결되었는가?", value=True)
         chk_2 = st.checkbox("✅ 2. 거짓 구매 후기가 일절 포함되지 않았는가? (표시광고법 준수)", value=True)
     with ap_c2:
-        chk_3 = st.checkbox("✅ 3. 이미지에서 전환된 텍스트 및 비교 수치가 사실과 일치하는가?", value=True)
-        chk_4 = st.checkbox("✅ 4. 제목 2줄 균형 및 16:9 이미지 좌우 여백이 정상인가?", value=True)
+        chk_3 = st.checkbox("✅ 3. 이전 샘플 내용과 섞이지 않고 본 상품 정보만 정확히 반영되었는가?", value=True)
+        chk_4 = st.checkbox("✅ 4. 상품 이미지가 잘리지 않고 원본 비율 그대로 선명하게 표시되는가?", value=True)
 
     is_approved = chk_1 and chk_2 and chk_3 and chk_4
     if is_approved:
@@ -465,12 +521,11 @@ elif st.session_state.current_page == "2_result":
 
     st.markdown("---")
 
-    # 2. 결과물 미리보기 탭
     st.markdown("#### 👁️ 생성된 결과물 한눈에 미리보기")
     res_tab1, res_tab2, res_tab3 = st.tabs([
-        "🌐 1. 웹 랜딩페이지 실시간 미리보기 (원본 동영상 재생 & 구매 버튼 작동)",
-        "🖼️ 2. 스마트스토어/부크크 등록용 통이미지 (PNG)",
-        "📸 3. 상세페이지에 합성된 AI 비주얼 이미지 3종 개별 다운로드"
+        "🌐 1. 웹 랜딩페이지 실시간 미리보기 (원본 비율 이미지 & 동영상 재생)",
+        "🖼️ 2. 스마트스토어/오픈마켓 등록용 통이미지 (PNG)",
+        "📸 3. 추출된 원본 비율 상품 이미지 개별 다운로드"
     ])
 
     with res_tab1:
@@ -489,24 +544,26 @@ elif st.session_state.current_page == "2_result":
     with res_tab3:
         saved_imgs = [p for p in fd.get("saved_image_paths", []) if os.path.exists(p)]
         if saved_imgs:
-            st.success(f"판매 페이지에서 총 {len(saved_imgs)}장의 상품 이미지를 자동 추출하여 `extracted_assets/` 폴더에 저장했습니다.")
+            st.success(f"판매 페이지에서 총 {len(saved_imgs)}장의 원본 비율 상품 이미지를 자르지 않고 그대로 추출하여 `extracted_assets/` 폴더에 저장했습니다.")
             cols = st.columns(min(len(saved_imgs), 3))
             for idx, img_p in enumerate(saved_imgs):
                 with cols[idx % len(cols)]:
-                    st.image(img_p, caption=f"추출된 상품 이미지 #{idx+1}", use_container_width=True)
+                    st.image(img_p, caption=f"원본 상품 이미지 #{idx+1}", use_container_width=True)
                     with open(img_p, "rb") as f_img:
-                        st.download_button(f"💾 이미지 #{idx+1} 다운로드", f_img.read(), os.path.basename(img_p), "image/jpeg", key=f"dl_ext_{idx}", use_container_width=True)
-        else:
+                        st.download_button(f"💾 원본 이미지 #{idx+1} 다운로드", f_img.read(), os.path.basename(img_p), "image/jpeg", key=f"dl_ext_{idx}", use_container_width=True)
+        elif "에세이 한 권으로 당신을 증명하라" in fd.get("prod_title", ""):
             ic1, ic2, ic3 = st.columns(3)
             with ic1:
                 if os.path.exists("product_images/book_cover.jpg"):
-                    st.image("product_images/book_cover.jpg", caption="📘 대표 상품 이미지 (3D 목업용)", use_container_width=True)
+                    st.image("product_images/book_cover.jpg", caption="📘 대표 도서 이미지 (3D 목업용)", use_container_width=True)
             with ic2:
                 if os.path.exists("product_images/scene_pain_point.jpg"):
-                    st.image("product_images/scene_pain_point.jpg", caption="🚨 AI 고통 상황 컷 (16:9 가로형)", use_container_width=True)
+                    st.image("product_images/scene_pain_point.jpg", caption="🚨 AI 고통 상황 컷", use_container_width=True)
             with ic3:
                 if os.path.exists("product_images/scene_solution.jpg"):
-                    st.image("product_images/scene_solution.jpg", caption="💡 AI 문제 해결 컷 (16:9 가로형)", use_container_width=True)
+                    st.image("product_images/scene_solution.jpg", caption="💡 AI 문제 해결 컷", use_container_width=True)
+        else:
+            st.info("추출된 상품 이미지가 없습니다.")
 
 # ==============================================================================
 # [페이지 3] 📋 100점 품질 진단 & 설득 카피 리포트 (보조 분석 페이지)
@@ -515,16 +572,16 @@ else:
     st.markdown("### 📋 [페이지 3] 하얀돌랩 8대 체크리스트 100점 진단 & 설득 카피 시트")
     bento = fd.get("bento_items", get_essay_book_preset()["bento_items"])
     detail_sections = [
-        {"index": 1, "role": "01. Hook", "question": "왜 지금 이 상품을 선택해야 하는가?", "headline": fd["headline_1"] + " " + fd["headline_2"], "subhead": fd["target_audience"], "image_tag": "📘 대표 상품 3D 목업"},
-        {"index": 2, "role": "02. Problem", "question": "고객이 겪던 기존 불편함은 무엇인가?", "headline": fd["pain_title"], "subhead": fd.get("pain_desc", ""), "image_tag": "🚨 [AI 상황 컷] 중앙 16:9 여백 배치"},
+        {"index": 1, "role": "01. Hook", "question": "왜 지금 이 상품을 선택해야 하는가?", "headline": fd["headline_1"] + " " + fd["headline_2"], "subhead": fd["target_audience"], "image_tag": "📸 원본 비율 대표 상품 이미지"},
+        {"index": 2, "role": "02. Problem", "question": "고객이 겪던 기존 불편함은 무엇인가?", "headline": fd["pain_title"], "subhead": fd.get("pain_desc", ""), "image_tag": "📸 원본 비율 상세 이미지 1"},
         {"index": 3, "role": "03. Empathy & Point 1", "question": "첫 번째 핵심 가치는 무엇인가?", "headline": bento[0]["title"], "subhead": bento[0]["desc"], "image_tag": "핵심 포인트 1 카드"},
         {"index": 4, "role": "04. Point 2", "question": "두 번째 차별화 포인트는 무엇인가?", "headline": bento[1]["title"], "subhead": bento[1]["desc"], "image_tag": "핵심 포인트 2 카드"},
-        {"index": 5, "role": "05. Solution", "question": "어떻게 문제를 명쾌하게 해결하는가?", "headline": fd["sol_title"], "subhead": fd.get("sol_desc", ""), "image_tag": "💡 [AI 해결 컷] 중앙 16:9 여백 배치"},
+        {"index": 5, "role": "05. Solution", "question": "어떻게 문제를 명쾌하게 해결하는가?", "headline": fd["sol_title"], "subhead": fd.get("sol_desc", ""), "image_tag": "📸 원본 비율 상세 이미지 2"},
         {"index": 6, "role": "06. Point 3", "question": "실전 활용성은 어떠한가?", "headline": bento[2]["title"], "subhead": bento[2]["desc"], "image_tag": "핵심 포인트 3 카드"},
         {"index": 7, "role": "07. Point 4", "question": "최종 기대 효과는 무엇인가?", "headline": bento[3]["title"], "subhead": bento[3]["desc"], "image_tag": "핵심 포인트 4 카드"},
         {"index": 8, "role": "08. Video & Proof", "question": "생생한 영상과 실제 구매자 반응은 어떠한가?", "headline": f"원본 동영상({len(fd.get('videos', []))}개) 보존 & 광고 포인트 베스트 리뷰 검증", "subhead": "과장 없는 실물 영상과 핵심 키워드 강조 리뷰로 신뢰를 증명합니다.", "image_tag": "🎬 원본 동영상 플레이어 & 리뷰 카드"},
-        {"index": 9, "role": "09. Spec & FAQ", "question": "구체적인 혜택과 자주 묻는 질문은?", "headline": "품격 있는 가치 비교표 · 특별 사은품 · FAQ 4선 완비", "subhead": f"메인 가격 {fd['price_main']}", "image_tag": "비교표 & FAQ 아코디언"},
-        {"index": 10, "role": "10. CTA", "question": "지금 바로 시작하려면 어떻게 해야 하는가?", "headline": f"『{fd['prod_title']}』 지금 바로 시작하세요!", "subhead": f"공식 판매가 {fd['price_main']}", "image_tag": "공식 구매 CTA 버튼"}
+        {"index": 9, "role": "09. Spec & FAQ", "question": "구체적인 혜택과 자주 묻는 질문은?", "headline": "품격 있는 가치 비교표 · FAQ 4선 완비", "subhead": f"메인 가격 {fd['price_main']}", "image_tag": "비교표 & FAQ 아코디언"},
+        {"index": 10, "role": "10. CTA", "question": "지금 바로 시작하려면 어떻게 해야 하는가?", "headline": f"『{fd['prod_title']}』 지금 바로 만나보세요!", "subhead": f"공식 판매가 {fd['price_main']}", "image_tag": "공식 구매 CTA 버튼"}
     ]
 
     generator = DetailPageGenerator()

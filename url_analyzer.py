@@ -262,8 +262,10 @@ class ProductURLAnalyzer:
 
         queries = []
         if search_query:
-            queries.append(search_query)
-            queries.append(f"{search_query} 후기")
+            clean_sq = re.sub(r"[:\[\]\(\)]", " ", search_query)
+            clean_sq = re.sub(r"\s+", " ", clean_sq).strip()
+            queries.append(clean_sq)
+            queries.append(f"{clean_sq.split()[0]} {clean_sq.split()[1] if len(clean_sq.split())>1 else ''} 후기".strip())
         if store_id and store_id not in search_query:
             queries.append(f"{store_id} {search_query}".strip())
 
@@ -312,13 +314,13 @@ class ProductURLAnalyzer:
                             if 4 <= len(cand_t) <= 45:
                                 data["title"] = cand_t
 
-                    # 실제 후기성 문장 감지 (일반 플랫폼 설명문이나 브랜드 소개문은 제외하고 실제 시식/사용 후기만 추출)
-                    if any(rk in l for rk in ["맛있", "쫄깃", "좋아요", "만족", "쟁여", "해먹", "구입", "구매", "후기", "최고", "추천", "편해", "충분", "식감"]):
-                        if 20 <= len(l) <= 185 and not any(skip in l for skip in [
-                            "검색 결과", "무료배송", "시작하기", "혜택받기", "비밀번호", "쇼핑라이브는", "원칙으로 합니다", "플랫폼입니다", "성분 분석"
+                    # 실제 후기성 문장 감지 (단순 가격표 라인이나 플랫폼 안내문은 제외하고 실제 시식/사용 후기만 추출)
+                    if any(rk in l for rk in ["맛있", "쫄깃", "좋아요", "만족", "쟁여", "해먹", "구입", "구매", "후기", "최고", "추천", "편해", "충분", "식감", "간단"]):
+                        if 24 <= len(l) <= 185 and not re.search(r"[0-9,]+원$", l) and not any(skip in l for skip in [
+                            "검색 결과", "무료배송", "시작하기", "혜택받기", "비밀번호", "쇼핑라이브는", "원칙으로 합니다", "플랫폼입니다", "성분 분석", "할인모음가"
                         ]):
                             clean_rev = re.sub(r",?\s*작성자\s*:.*$", "", l).strip(" ,·-")
-                            if len(clean_rev) >= 18:
+                            if len(clean_rev) >= 20:
                                 raw_reviews.append({"text": clean_rev, "author": "네이버페이 구매자"})
 
                     # 상품 특장점/원료/제조 노하우 문장 감지
